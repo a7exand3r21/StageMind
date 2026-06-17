@@ -1,0 +1,46 @@
+{
+  "Name": "StageMind Node",
+  "Version": "0.8.9",
+  "Factory Info": {
+    "Vendor": "StageMind",
+    "URL": "",
+    "E-Mail": "",
+    "Flags": {
+      "Unicode": true,
+      "Classes Discardable": false,
+      "Component Non Discardable": false,
+    },
+  },
+  "Classes": [
+    {
+      "CID": "ABCDEF019182FAEB53744D6E536D4E64",
+      "Category": "Audio Module Class",
+      "Name": "StageMind Node",
+      "Vendor": "StageMind",
+      "Version": "0.8.9",
+      "SDKVersion": "VST 3.8.0",
+      "Sub Categories": [
+        "Fx",
+      ],
+      "Class Flags": 0,
+      "Cardinality": 2147483647,
+      "Snapshots": [
+      ],
+    },
+    {
+      "CID": "ABCDEF011234ABCD53744D6E536D4E64",
+      "Category": "Component Controller Class",
+      "Name": "StageMind Node",
+      "Vendor": "StageMind",
+      "Version": "0.8.9",
+      "SDKVersion": "VST 3.8.0",
+      "Sub Categories": [
+        "Fx",
+      ],
+      "Class Flags": 0,
+      "Cardinality": 2147483647,
+      "Snapshots": [
+      ],
+    },
+  ],
+}

@@ -1,0 +1,25 @@
+# Build outputs
+build/
+build-*/
+out/
+
+# IDE and local machine state
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Compiler/linker intermediates
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+Thumbs.db
+desktop.ini
