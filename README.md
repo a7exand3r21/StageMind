@@ -172,12 +172,6 @@ JUCE is fetched by CMake from the official JUCE GitHub repository.
 
 After the VST3 build succeeds, either point FL Studio to the generated build output directory, or use the smaller packaged directory.
 
-Recommended development path:
-
-```text
-C:\Users\user\Desktop\StageMind\dist\VST3
-```
-
 Add that folder once in FL Studio Plugin Manager. After that, run `scripts\build-and-package-vst3.cmd` and rescan the plugin when needed.
 
 For another machine, copy only `dist\VST3\StageMind Node.vst3`. If FL Studio crashes or fails during scan on a clean Windows install, install the Microsoft Visual C++ Redistributable x64 first. The Release VST3 depends on the normal MSVC runtime, not the debug runtime.
