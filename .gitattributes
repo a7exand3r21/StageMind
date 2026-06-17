@@ -8,6 +8,8 @@
 *.c text eol=lf
 *.cmake text eol=lf
 CMakeLists.txt text eol=lf
+.gitattributes text eol=lf
+LICENSE text eol=lf
 *.cmd text eol=crlf
 
 *.vst3 binary

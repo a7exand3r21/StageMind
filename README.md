@@ -4,6 +4,13 @@ StageMind is a FL Studio-first VST3 insert effect for role-aware stem mixing.
 
 The MVP artifact is `StageMind Node.vst3`.
 
+## License
+
+StageMind is source-available, not open-source under a permissive license.
+
+Personal testing, learning, and internal evaluation are allowed. Commercial use
+requires prior written permission from the author. See `LICENSE`.
+
 ## MVP Status
 
 Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.8.6 defaults new instances to Link Group 1, Link On, and Auto Assist On.
