@@ -316,6 +316,7 @@ void runLinkActivityEnvelopeTests();
 void runLinkSuggestionEngineTests();
 void runLinkSpectralAnalyzerTests();
 void runRideMemoryTests();
+void runRideTimelineMemoryTests();
 
 int main()
 {
@@ -333,6 +334,7 @@ int main()
     runLinkSuggestionEngineTests();
     runLinkSpectralAnalyzerTests();
     runRideMemoryTests();
+    runRideTimelineMemoryTests();
 
     std::cout << "StageMindDSPTests passed\n";
     return 0;

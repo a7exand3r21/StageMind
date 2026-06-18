@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "../Model/AutoAssistMode.h"
+#include "../Model/MotionPreset.h"
 #include "../Model/PluginMode.h"
 #include "../Model/SafetyMode.h"
 #include "../Model/SidechainConflictMode.h"
@@ -20,6 +21,18 @@ constexpr auto linkSuggestionHoldFrames = 30;
 constexpr auto linkResolvedHoldFrames = 90;
 constexpr auto directorConflictResolveFrames = 120;
 constexpr auto directorGroupCount = 16;
+
+struct NodeHardwareLayout
+{
+    juce::Rectangle<int> shell;
+    juce::Rectangle<int> header;
+    juce::Rectangle<int> brand;
+    juce::Rectangle<int> glassControls;
+    juce::Rectangle<int> modeControl;
+    juce::Rectangle<int> autoControl;
+    juce::Rectangle<int> sidechainHeaderButton;
+    std::array<juce::Rectangle<int>, 5> modules;
+};
 
 bool approximatelyEqual(float first, float second) noexcept
 {
@@ -67,6 +80,119 @@ int wrappedDirectorGroup(int group) noexcept
 juce::Rectangle<int> takeTop(juce::Rectangle<int>& area, int amount) noexcept
 {
     return area.removeFromTop(std::min(amount, area.getHeight()));
+}
+
+NodeHardwareLayout makeNodeHardwareLayout(juce::Rectangle<int> localBounds, bool compactHeight)
+{
+    NodeHardwareLayout layout;
+    layout.shell = localBounds.reduced(theme::margin);
+
+    auto inner = layout.shell.reduced(compactHeight ? 12 : 18, compactHeight ? 10 : 16);
+    layout.header = takeTop(inner, compactHeight ? 72 : 86);
+    takeTop(inner, compactHeight ? 8 : 14);
+
+    layout.brand = layout.header.removeFromLeft(juce::jlimit(190, 310, layout.header.getWidth() / 4));
+    layout.sidechainHeaderButton = layout.header.removeFromRight(juce::jlimit(150, 230, layout.header.getWidth() / 4)).reduced(14, compactHeight ? 18 : 22);
+    layout.glassControls = layout.header.withTrimmedLeft(juce::jmin(12, layout.header.getWidth())).withTrimmedRight(juce::jmin(12, layout.header.getWidth())).reduced(0, compactHeight ? 8 : 10);
+
+    auto brandUtility = layout.brand.removeFromBottom(compactHeight ? 36 : 40).reduced(6, 3);
+    layout.modeControl = brandUtility.removeFromLeft(juce::jmin(112, brandUtility.getWidth() / 2)).reduced(0, 2);
+    brandUtility.removeFromLeft(juce::jmin(6, brandUtility.getWidth()));
+    layout.autoControl = brandUtility.removeFromLeft(juce::jmin(96, brandUtility.getWidth())).reduced(0, 2);
+
+    auto body = inner.reduced(0, compactHeight ? 0 : 2);
+    const auto gap = compactHeight ? 4 : 6;
+    const auto usableWidth = std::max(1, body.getWidth() - gap * 4);
+    const auto stageWidth = juce::jlimit(190, 330, static_cast<int> (static_cast<float> (usableWidth) * 0.22f));
+    const auto spaceWidth = juce::jlimit(150, 240, static_cast<int> (static_cast<float> (usableWidth) * 0.18f));
+    const auto characterWidth = juce::jlimit(160, 260, static_cast<int> (static_cast<float> (usableWidth) * 0.20f));
+    const auto sidechainWidth = juce::jlimit(155, 245, static_cast<int> (static_cast<float> (usableWidth) * 0.18f));
+
+    auto columns = body;
+    layout.modules[0] = columns.removeFromLeft(std::min(stageWidth, columns.getWidth()));
+    columns.removeFromLeft(std::min(gap, columns.getWidth()));
+    layout.modules[1] = columns.removeFromLeft(std::min(spaceWidth, columns.getWidth()));
+    columns.removeFromLeft(std::min(gap, columns.getWidth()));
+    layout.modules[2] = columns.removeFromLeft(std::min(characterWidth, columns.getWidth()));
+    columns.removeFromLeft(std::min(gap, columns.getWidth()));
+    layout.modules[3] = columns.removeFromLeft(std::min(sidechainWidth, columns.getWidth()));
+    columns.removeFromLeft(std::min(gap, columns.getWidth()));
+    layout.modules[4] = columns;
+
+    return layout;
+}
+
+void drawHardwareModule(juce::Graphics& g, juce::Rectangle<int> bounds, const juce::String& number, const juce::String& title)
+{
+    const auto panel = bounds.toFloat();
+    juce::DropShadow(theme::shadow.withAlpha(0.45f), 8, { 0, 3 }).drawForRectangle(g, bounds);
+
+    juce::ColourGradient gradient(
+        theme::panelRaised,
+        panel.getCentreX(),
+        panel.getY(),
+        theme::panelInset,
+        panel.getCentreX(),
+        panel.getBottom(),
+        false);
+    gradient.addColour(0.45, juce::Colour { 0xfffdfdfb });
+    g.setGradientFill(gradient);
+    g.fillRoundedRectangle(panel, 16.0f);
+
+    g.setColour(juce::Colours::white.withAlpha(0.78f));
+    g.drawRoundedRectangle(panel.reduced(1.0f), 15.0f, 1.0f);
+    g.setColour(theme::border.withAlpha(0.90f));
+    g.drawRoundedRectangle(panel.reduced(0.5f), 16.0f, 1.0f);
+
+    auto titleArea = bounds.removeFromTop(42).reduced(12, 0);
+    g.setColour(theme::text.withAlpha(0.88f));
+    g.setFont(juce::FontOptions { 13.0f, juce::Font::plain });
+    g.drawText(number, titleArea.removeFromLeft(28), juce::Justification::centred);
+    g.setColour(theme::textMuted.withAlpha(0.85f));
+    g.setFont(juce::FontOptions { 13.0f });
+    g.drawFittedText(title, titleArea, juce::Justification::centredLeft, 1);
+}
+
+void drawHeaderGlass(juce::Graphics& g, juce::Rectangle<int> bounds)
+{
+    const auto glass = bounds.toFloat();
+    juce::DropShadow(theme::shadow.withAlpha(0.50f), 8, { 0, 2 }).drawForRectangle(g, bounds);
+    juce::ColourGradient gradient(
+        theme::displayRaised,
+        glass.getCentreX(),
+        glass.getY(),
+        theme::display,
+        glass.getCentreX(),
+        glass.getBottom(),
+        false);
+    gradient.addColour(0.08, juce::Colour { 0xff2b3339 });
+    g.setGradientFill(gradient);
+    g.fillRoundedRectangle(glass, 16.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.10f));
+    g.fillRoundedRectangle(glass.reduced(4.0f).withHeight(glass.getHeight() * 0.36f), 12.0f);
+    g.setColour(theme::borderDark.withAlpha(0.70f));
+    g.drawRoundedRectangle(glass.reduced(0.5f), 16.0f, 1.0f);
+
+    g.setColour(theme::textOnDisplay.withAlpha(0.18f));
+    const auto firstSeparator = glass.getX() + glass.getWidth() / 3.0f;
+    const auto secondSeparator = glass.getX() + glass.getWidth() * 2.0f / 3.0f;
+    g.drawVerticalLine(static_cast<int> (firstSeparator), glass.getY() + 14.0f, glass.getBottom() - 14.0f);
+    g.drawVerticalLine(static_cast<int> (secondSeparator), glass.getY() + 14.0f, glass.getBottom() - 14.0f);
+}
+
+void drawBrand(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    auto brand = area.withTrimmedTop(6).reduced(6, 0);
+    g.setFont(juce::FontOptions { 24.0f, juce::Font::plain });
+    g.setColour(theme::text);
+    g.drawText("STAGE", brand.removeFromTop(28).removeFromLeft(112), juce::Justification::centredLeft);
+    auto mind = area.withTrimmedTop(6).withTrimmedLeft(106).withHeight(28);
+    g.setColour(juce::Colour { 0xff35d8e3 });
+    g.drawText("MIND", mind, juce::Justification::centredLeft);
+
+    g.setColour(theme::textMuted);
+    g.setFont(juce::FontOptions { 11.0f });
+    g.drawFittedText("S P A T I A L   P R O C E S S O R", area.withTrimmedTop(36).withHeight(18).reduced(6, 0), juce::Justification::centredLeft, 1);
 }
 
 const char* strongestBandName(LinkSpectralBands bands) noexcept
@@ -119,6 +245,36 @@ void layoutRotaryRow(
     layoutRotary(thirdLabel, thirdSlider, area);
 }
 
+struct RotaryRef
+{
+    juce::Label* label = nullptr;
+    juce::Slider* slider = nullptr;
+};
+
+void layoutRotaryGrid(juce::Rectangle<int> area, std::array<RotaryRef, 4> controls, int count)
+{
+    if (count <= 0)
+        return;
+
+    const auto columns = count == 4 && area.getWidth() < 420 ? 2 : count;
+    const auto rows = (count + columns - 1) / columns;
+    const auto rowHeight = std::max(1, area.getHeight() / rows);
+    auto index = 0;
+
+    for (int row = 0; row < rows && index < count; ++row)
+    {
+        auto rowArea = area.removeFromTop(row == rows - 1 ? area.getHeight() : rowHeight);
+        const auto cellsInRow = std::min(columns, count - index);
+        const auto columnWidth = std::max(1, rowArea.getWidth() / cellsInRow);
+
+        for (int column = 0; column < cellsInRow && index < count; ++column, ++index)
+        {
+            auto cell = column == cellsInRow - 1 ? rowArea : rowArea.removeFromLeft(columnWidth);
+            layoutRotary(*controls[static_cast<size_t> (index)].label, *controls[static_cast<size_t> (index)].slider, cell);
+        }
+    }
+}
+
 void layoutMeterRow(
     juce::Rectangle<int> area,
     MeterView& inputMeter,
@@ -131,6 +287,12 @@ void layoutMeterRow(
     outputMeter.setBounds(area.removeFromLeft(meterWidth).reduced(2));
     sidechainMeter.setBounds(area.removeFromLeft(meterWidth).reduced(2));
     reductionMeter.setBounds(area.reduced(2));
+}
+
+void layoutUtilityCombo(juce::Label& label, juce::ComboBox& combo, juce::Rectangle<int> bounds)
+{
+    label.setBounds({});
+    combo.setBounds(bounds.reduced(0, 1));
 }
 
 juce::String shortLabelForRole(TrackRole role)
@@ -220,6 +382,47 @@ juce::String sceneLabelForSuggestion(LinkSuggestionKind kind)
     }
 }
 
+juce::String actionLabelForTimelineEvent(int actionKind)
+{
+    const auto kind = static_cast<LinkSuggestionKind> (actionKind);
+    const auto action = LinkSuggestionEngine::actionFor(kind);
+    if (action.previewMessage[0] != '\0')
+        return action.previewMessage;
+
+    return sceneLabelForSuggestion(kind);
+}
+
+const char* rideMemoryBandLabel(int band) noexcept
+{
+    switch (static_cast<RideMemoryBand> (band))
+    {
+        case RideMemoryBand::Low:      return "low";
+        case RideMemoryBand::LowMid:   return "low-mid";
+        case RideMemoryBand::Presence: return "presence";
+        case RideMemoryBand::Air:      return "air";
+        case RideMemoryBand::Unknown:
+        default:                       return "band";
+    }
+}
+
+juce::String ppqText(double ppqPosition)
+{
+    return "PPQ " + juce::String(ppqPosition, 1);
+}
+
+juce::String timelineEventText(const RideTimelineEvent& event)
+{
+    auto text = ppqText(event.lastSeenPpq)
+        + " " + shortLabelForRole(static_cast<TrackRole> (event.targetRole))
+        + " <- " + shortLabelForRole(static_cast<TrackRole> (event.sourceRole))
+        + " " + actionLabelForTimelineEvent(event.actionKind);
+
+    text += " / ";
+    text += rideMemoryBandLabel(event.band);
+    text += event.resolved ? " resolved" : " pending";
+    return text;
+}
+
 juce::String paddedGroupNumber(int group)
 {
     return group < 10 ? "0" + juce::String(group) : juce::String(group);
@@ -257,11 +460,12 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
       processor(processorToUse),
       apvts(processorToUse.getValueTreeState())
 {
+    setLookAndFeel(&hardwareLookAndFeel);
     setResizable(true, true);
-    setResizeLimits(760, 500, 1400, 920);
-    setSize(980, 620);
+    setResizeLimits(1040, 640, 1600, 980);
+    setSize(1280, 760);
 
-    titleLabel.setText("StageMind Node " + juce::String(JucePlugin_VersionString), juce::dontSendNotification);
+    titleLabel.setText("", juce::dontSendNotification);
     titleLabel.setColour(juce::Label::textColourId, theme::text);
     titleLabel.setFont(juce::FontOptions { 22.0f, juce::Font::bold });
     addAndMakeVisible(titleLabel);
@@ -275,14 +479,27 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     setupCombo(roleCombo, makeSelectableRoleNames());
     setupCombo(safetyCombo, makeSafetyModeNames());
     setupCombo(triggerCombo, makeTriggerModeNames());
+    setupCombo(motionPresetCombo, makeMotionPresetNames());
     setupCombo(sidechainModeCombo, makeSidechainConflictModeNames());
     setupCombo(sidechainListenCombo, { "Off", "Sidechain Only" });
     auto linkSourceRoleNames = makeRoleNamesWithUnknown();
     linkSourceRoleNames.set(0, "Any Role");
     setupCombo(linkSourceRoleCombo, linkSourceRoleNames);
+    modeCombo.setComponentID("miniCombo");
+    autoAssistCombo.setComponentID("miniCombo");
+    roleCombo.setComponentID("headerCombo");
+    safetyCombo.setComponentID("headerCombo");
+    motionPresetCombo.setComponentID("headerCombo");
 
     sidechainEnableButton.setClickingTogglesState(true);
     linkEnableButton.setClickingTogglesState(true);
+    sidechainEnableButton.setComponentID("pillGlowButton");
+    linkEnableButton.setComponentID("glowButton");
+    linkApplyTipButton.setComponentID("softButton");
+    resonanceLearnButton.setComponentID("pillGlowButton");
+    sidechainEnableButton.setColour(juce::TextButton::textColourOffId, theme::accent.darker(0.25f));
+    linkEnableButton.setColour(juce::TextButton::textColourOffId, theme::accent.darker(0.15f));
+    resonanceLearnButton.setColour(juce::TextButton::textColourOffId, theme::textMuted);
     setupButton(sidechainEnableButton);
     setupButton(linkEnableButton);
     setupButton(linkApplyTipButton);
@@ -292,6 +509,9 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     setupButton(directorPreviousGroupButton);
     setupButton(directorNextGroupButton);
     setupButton(resonanceLearnButton);
+    sidechainEnableButton.setColour(juce::TextButton::textColourOffId, theme::accent.darker(0.25f));
+    linkEnableButton.setColour(juce::TextButton::textColourOffId, theme::accent.darker(0.15f));
+    resonanceLearnButton.setColour(juce::TextButton::textColourOffId, theme::textMuted);
     resonanceLearnButton.onClick = [this]
     {
         processor.beginResonanceLearn();
@@ -326,23 +546,26 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     layoutLabeledCombo(roleLabel, roleCombo, {});
     layoutLabeledCombo(safetyLabel, safetyCombo, {});
     layoutLabeledCombo(triggerLabel, triggerCombo, {});
+    layoutLabeledCombo(motionPresetLabel, motionPresetCombo, {});
     layoutLabeledCombo(sidechainModeLabel, sidechainModeCombo, {});
     layoutLabeledCombo(sidechainListenLabel, sidechainListenCombo, {});
     layoutLabeledCombo(linkSourceRoleLabel, linkSourceRoleCombo, {});
-    modeLabel.setText("Mode", juce::dontSendNotification);
-    autoAssistLabel.setText("Auto", juce::dontSendNotification);
-    roleLabel.setText("Role", juce::dontSendNotification);
-    safetyLabel.setText("Safety", juce::dontSendNotification);
-    triggerLabel.setText("Trigger", juce::dontSendNotification);
-    sidechainModeLabel.setText("SC Mode", juce::dontSendNotification);
-    sidechainListenLabel.setText("SC Listen", juce::dontSendNotification);
-    linkSourceRoleLabel.setText("Source", juce::dontSendNotification);
+    modeLabel.setText("MODE", juce::dontSendNotification);
+    autoAssistLabel.setText("AUTO", juce::dontSendNotification);
+    roleLabel.setText("ROLE", juce::dontSendNotification);
+    safetyLabel.setText("PRESET", juce::dontSendNotification);
+    triggerLabel.setText("TRIGGER", juce::dontSendNotification);
+    motionPresetLabel.setText("MOTION", juce::dontSendNotification);
+    sidechainModeLabel.setText("MAKE SPACE", juce::dontSendNotification);
+    sidechainListenLabel.setText("SC LISTEN", juce::dontSendNotification);
+    linkSourceRoleLabel.setText("ROLE", juce::dontSendNotification);
 
     setupSlider(widthSlider, widthLabel, "Width");
     setupSlider(depthSlider, depthLabel, "Depth");
     setupSlider(motionSlider, motionLabel, "Motion");
     setupSlider(cleanUpSlider, cleanUpLabel, "Clean Up");
     setupSlider(resonanceSlider, resonanceLabel, "Resonance");
+    setupSlider(doubleSlider, doubleLabel, "Double");
     setupSlider(outputSlider, outputLabel, "Output");
     setupSlider(sidechainAmountSlider, sidechainAmountLabel, "SC Amount");
 
@@ -466,6 +689,7 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     roleAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::role, roleCombo);
     safetyAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::safety, safetyCombo);
     triggerAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::triggerMode, triggerCombo);
+    motionPresetAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::motionPreset, motionPresetCombo);
     sidechainModeAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::sidechainMode, sidechainModeCombo);
     sidechainListenAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::sidechainListen, sidechainListenCombo);
     linkSourceRoleAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::linkRole, linkSourceRoleCombo);
@@ -476,6 +700,7 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     motionAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::motion, motionSlider);
     cleanUpAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::cleanUp, cleanUpSlider);
     resonanceAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::resonance, resonanceSlider);
+    doubleAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::pseudoDoubleAmount, doubleSlider);
     outputAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::outputGain, outputSlider);
     sidechainAmountAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::sidechainAmount, sidechainAmountSlider);
 
@@ -486,16 +711,54 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     startTimerHz(30);
 }
 
+PluginEditor::~PluginEditor()
+{
+    setLookAndFeel(nullptr);
+}
+
 void PluginEditor::paint(juce::Graphics& g)
 {
     g.fillAll(theme::background);
 
     auto bounds = getLocalBounds().reduced(theme::margin).toFloat();
-    g.setColour(theme::panel);
+    juce::DropShadow(theme::shadow, 18, { 0, 8 }).drawForRectangle(g, bounds.toNearestInt());
+
+    juce::ColourGradient shell(
+        theme::panelRaised,
+        bounds.getCentreX(),
+        bounds.getY(),
+        theme::panelInset,
+        bounds.getCentreX(),
+        bounds.getBottom(),
+        false);
+    shell.addColour(0.48, theme::panel);
+    g.setGradientFill(shell);
     g.fillRoundedRectangle(bounds, static_cast<float> (theme::corner));
 
+    g.setColour(juce::Colours::white.withAlpha(0.78f));
+    g.drawRoundedRectangle(bounds.reduced(1.0f), static_cast<float> (theme::corner), 1.0f);
     g.setColour(theme::border);
     g.drawRoundedRectangle(bounds.reduced(0.5f), static_cast<float> (theme::corner), 1.0f);
+
+    if (! isDirectorMode())
+    {
+        const auto nodeLayout = makeNodeHardwareLayout(getLocalBounds(), getHeight() < 700);
+        drawBrand(g, nodeLayout.brand);
+        drawHeaderGlass(g, nodeLayout.glassControls);
+        drawHardwareModule(g, nodeLayout.modules[0], "1", "S T A G E   V I E W");
+        drawHardwareModule(g, nodeLayout.modules[1], "2", "S P A C E");
+        drawHardwareModule(g, nodeLayout.modules[2], "3", "C H A R A C T E R");
+        drawHardwareModule(g, nodeLayout.modules[3], "4", "S I D E C H A I N");
+        drawHardwareModule(g, nodeLayout.modules[4], "5", "M E T E R I N G");
+    }
+
+    g.setColour(theme::textMuted.withAlpha(0.72f));
+    g.setFont(juce::FontOptions { 8.0f, juce::Font::plain });
+    g.drawFittedText(
+        "S T A G E M I N D",
+        getLocalBounds().removeFromBottom(theme::margin).reduced(0, 2),
+        juce::Justification::centred,
+        1);
 }
 
 void PluginEditor::resized()
@@ -503,8 +766,89 @@ void PluginEditor::resized()
     updateVisibleMode();
 
     auto bounds = getLocalBounds().reduced(theme::margin);
-    const auto compactHeight = getHeight() < 570;
+    const auto compactHeight = getHeight() < 700;
     const auto innerGap = compactHeight ? 6 : theme::gap;
+
+    if (! isDirectorMode())
+    {
+        const auto nodeLayout = makeNodeHardwareLayout(getLocalBounds(), compactHeight);
+
+        titleLabel.setBounds({});
+        currentRoleLabel.setBounds({});
+        roleLabel.setColour(juce::Label::textColourId, juce::Colour { 0xff6cebf1 });
+        safetyLabel.setColour(juce::Label::textColourId, juce::Colour { 0xff6cebf1 });
+        motionPresetLabel.setColour(juce::Label::textColourId, juce::Colour { 0xff6cebf1 });
+        triggerLabel.setColour(juce::Label::textColourId, theme::textMuted);
+        sidechainModeLabel.setColour(juce::Label::textColourId, theme::textMuted);
+        sidechainListenLabel.setColour(juce::Label::textColourId, theme::textMuted);
+        linkSourceRoleLabel.setColour(juce::Label::textColourId, theme::textMuted);
+        layoutUtilityCombo(modeLabel, modeCombo, nodeLayout.modeControl);
+        layoutUtilityCombo(autoAssistLabel, autoAssistCombo, nodeLayout.autoControl);
+
+        auto glass = nodeLayout.glassControls.reduced(compactHeight ? 18 : 26, compactHeight ? 8 : 12);
+        const auto glassColumnWidth = std::max(1, glass.getWidth() / 3);
+        layoutLabeledCombo(roleLabel, roleCombo, glass.removeFromLeft(glassColumnWidth).reduced(4, 0));
+        layoutLabeledCombo(safetyLabel, safetyCombo, glass.removeFromLeft(glassColumnWidth).reduced(4, 0));
+        layoutLabeledCombo(motionPresetLabel, motionPresetCombo, glass.reduced(4, 0));
+        sidechainEnableButton.setBounds(nodeLayout.sidechainHeaderButton);
+
+        auto stageModule = nodeLayout.modules[0].reduced(16, 14);
+        takeTop(stageModule, compactHeight ? 40 : 48);
+        stageView.setBounds(stageModule.reduced(4, 0));
+
+        auto spaceModule = nodeLayout.modules[1].reduced(20, 14);
+        takeTop(spaceModule, compactHeight ? 42 : 52);
+        const auto spaceKnobHeight = std::max(90, spaceModule.getHeight() / 3);
+        layoutRotary(widthLabel, widthSlider, takeTop(spaceModule, spaceKnobHeight));
+        layoutRotary(depthLabel, depthSlider, takeTop(spaceModule, spaceKnobHeight));
+        layoutRotary(motionLabel, motionSlider, spaceModule);
+
+        auto characterModule = nodeLayout.modules[2].reduced(20, 14);
+        takeTop(characterModule, compactHeight ? 42 : 52);
+        const auto outputStripHeight = compactHeight ? 64 : 78;
+        auto characterKnobs = characterModule;
+        characterKnobs.removeFromBottom(outputStripHeight);
+        const auto characterKnobHeight = std::max(82, characterKnobs.getHeight() / 3);
+        layoutRotary(cleanUpLabel, cleanUpSlider, takeTop(characterKnobs, characterKnobHeight));
+        layoutRotary(resonanceLabel, resonanceSlider, takeTop(characterKnobs, characterKnobHeight));
+        layoutRotary(doubleLabel, doubleSlider, characterKnobs);
+
+        auto outputStrip = characterModule.removeFromBottom(outputStripHeight);
+        outputLabel.setBounds(takeTop(outputStrip, 18));
+        outputSlider.setBounds(outputStrip.reduced(6, 4));
+
+        auto sidechainModule = nodeLayout.modules[3].reduced(18, 14);
+        takeTop(sidechainModule, compactHeight ? 42 : 52);
+        layoutLabeledCombo(triggerLabel, triggerCombo, takeTop(sidechainModule, compactHeight ? 48 : 54).reduced(4, 0));
+        takeTop(sidechainModule, compactHeight ? 4 : 8);
+        layoutRotary(sidechainAmountLabel, sidechainAmountSlider, takeTop(sidechainModule, compactHeight ? 118 : 148));
+        layoutLabeledCombo(sidechainModeLabel, sidechainModeCombo, takeTop(sidechainModule, compactHeight ? 48 : 54).reduced(4, 0));
+        layoutLabeledCombo(sidechainListenLabel, sidechainListenCombo, takeTop(sidechainModule, compactHeight ? 48 : 54).reduced(4, 0));
+        sidechainStatusLabel.setBounds(takeTop(sidechainModule, compactHeight ? 22 : 26).reduced(4, 0));
+
+        auto linkRow = takeTop(sidechainModule, compactHeight ? 34 : 40).reduced(4, 4);
+        linkEnableButton.setBounds(linkRow.removeFromLeft(std::min(64, linkRow.getWidth())));
+        linkRow.removeFromLeft(std::min(8, linkRow.getWidth()));
+        linkGroupLabel.setBounds(linkRow.removeFromLeft(std::min(54, linkRow.getWidth())));
+        linkGroupEditor.setBounds(linkRow.removeFromLeft(std::min(46, linkRow.getWidth())));
+        layoutLabeledCombo(linkSourceRoleLabel, linkSourceRoleCombo, takeTop(sidechainModule, compactHeight ? 44 : 50).reduced(4, 0));
+        linkStatusLabel.setBounds(takeTop(sidechainModule, compactHeight ? 22 : 24).reduced(4, 0));
+        linkDetailLabel.setBounds(takeTop(sidechainModule, compactHeight ? 22 : 24).reduced(4, 0));
+        linkSuggestionLabel.setBounds(takeTop(sidechainModule, compactHeight ? 22 : 24).reduced(4, 0));
+        linkActionPreviewLabel.setBounds(takeTop(sidechainModule, compactHeight ? 22 : 24).reduced(4, 0));
+        linkApplyTipButton.setBounds(takeTop(sidechainModule, compactHeight ? 28 : 32).reduced(4, 2));
+        autoAssistStatusLabel.setBounds(sidechainModule.reduced(4, 0));
+
+        auto meteringModule = nodeLayout.modules[4].reduced(16, 14);
+        takeTop(meteringModule, compactHeight ? 42 : 52);
+        const auto meterHeight = juce::jlimit(150, compactHeight ? 230 : 300, meteringModule.getHeight() / 2);
+        layoutMeterRow(takeTop(meteringModule, meterHeight), inputMeter, outputMeter, sidechainMeter, reductionMeter);
+        correlationLabel.setBounds(takeTop(meteringModule, compactHeight ? 32 : 38).reduced(4, 0));
+        resonanceLearnButton.setBounds(takeTop(meteringModule, compactHeight ? 34 : 40).reduced(8, 4));
+        takeTop(meteringModule, compactHeight ? 4 : 8);
+        resonanceList.setBounds(meteringModule.reduced(4, 0));
+        return;
+    }
 
     auto header = takeTop(bounds, compactHeight ? 38 : 46);
     const auto titleWidth = clampedInt(header.getWidth() / 3, 220, 330);
@@ -544,7 +888,7 @@ void PluginEditor::resized()
         const auto directorButtonHeight = compactHeight ? 28 : 32;
         const auto directorFooterHeight = compactHeight ? 28 : 34;
         const auto directorGroupsHeight = compactHeight ? 68 : 86;
-        const auto directorMemoryHeight = compactHeight ? 44 : 54;
+        const auto directorMemoryHeight = compactHeight ? 78 : 94;
 
         auto inspectorInner = inspector.reduced(6);
         directorSelectedTitleLabel.setBounds(takeTop(inspectorInner, compactHeight ? 22 : 26));
@@ -642,8 +986,9 @@ void PluginEditor::resized()
     resonanceList.setBounds(rightArea.reduced(4));
 
     auto centerArea = center.reduced(2);
+    const auto motionPresetHeight = compactHeight ? 42 : 48;
     const auto outputBlockHeight = clampedInt(centerArea.getHeight() / 5, 54, compactHeight ? 68 : 82);
-    const auto rowHeight = std::max(96, (centerArea.getHeight() - outputBlockHeight - innerGap * 2) / 2);
+    const auto rowHeight = std::max(96, (centerArea.getHeight() - outputBlockHeight - motionPresetHeight - innerGap * 3) / 2);
 
     layoutRotaryRow(
         takeTop(centerArea, rowHeight),
@@ -655,15 +1000,16 @@ void PluginEditor::resized()
         motionSlider);
 
     takeTop(centerArea, innerGap);
+    layoutLabeledCombo(motionPresetLabel, motionPresetCombo, takeTop(centerArea, motionPresetHeight).reduced(4));
+    takeTop(centerArea, innerGap);
 
-    layoutRotaryRow(
-        takeTop(centerArea, rowHeight),
-        cleanUpLabel,
-        cleanUpSlider,
-        resonanceLabel,
-        resonanceSlider,
-        sidechainAmountLabel,
-        sidechainAmountSlider);
+    std::array<RotaryRef, 4> bottomControls {{
+        { &cleanUpLabel, &cleanUpSlider },
+        { &resonanceLabel, &resonanceSlider },
+        { &doubleLabel, &doubleSlider },
+        { &sidechainAmountLabel, &sidechainAmountSlider }
+    }};
+    layoutRotaryGrid(takeTop(centerArea, rowHeight), bottomControls, 4);
 
     takeTop(centerArea, innerGap);
     outputLabel.setBounds(takeTop(centerArea, 22));
@@ -711,7 +1057,11 @@ void PluginEditor::timerCallback()
 
     const auto requestedMotion = apvts.getRawParameterValue(parameters::ids::motion)->load(std::memory_order_relaxed);
     const auto motionRate = apvts.getRawParameterValue(parameters::ids::motionRate)->load(std::memory_order_relaxed);
-    stageMotionPhase += juce::MathConstants<float>::twoPi * juce::jlimit(0.01f, 8.0f, motionRate) / 30.0f;
+    const auto motionPreset = static_cast<int> (
+        apvts.getRawParameterValue(parameters::ids::motionPreset)->load(std::memory_order_relaxed));
+    stageMotionPhase += juce::MathConstants<float>::twoPi
+        * motionPresetEffectiveRateHz(motionPresetFromIndex(motionPreset), motionRate)
+        / 30.0f;
     if (stageMotionPhase >= juce::MathConstants<float>::twoPi)
         stageMotionPhase -= juce::MathConstants<float>::twoPi;
 
@@ -1033,9 +1383,10 @@ void PluginEditor::timerCallback()
 
 void PluginEditor::setupCombo(juce::ComboBox& combo, const juce::StringArray& items)
 {
-    combo.setColour(juce::ComboBox::backgroundColourId, theme::panelRaised);
-    combo.setColour(juce::ComboBox::textColourId, theme::text);
-    combo.setColour(juce::ComboBox::outlineColourId, theme::border);
+    combo.setColour(juce::ComboBox::backgroundColourId, theme::display);
+    combo.setColour(juce::ComboBox::textColourId, theme::textOnDisplay);
+    combo.setColour(juce::ComboBox::outlineColourId, theme::borderDark.withAlpha(0.55f));
+    combo.setColour(juce::ComboBox::arrowColourId, theme::textOnDisplay);
 
     for (int i = 0; i < items.size(); ++i)
         combo.addItem(items[i], i + 1);
@@ -1045,19 +1396,35 @@ void PluginEditor::setupCombo(juce::ComboBox& combo, const juce::StringArray& it
 
 void PluginEditor::setupSlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText)
 {
-    label.setText(labelText, juce::dontSendNotification);
+    label.setText(labelText.toUpperCase(), juce::dontSendNotification);
     label.setColour(juce::Label::textColourId, theme::textMuted);
     label.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(label);
 
     slider.setSliderStyle(labelText == "Output" ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 76, 22);
+    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, labelText == "Output" ? 78 : 58, 22);
+    if (labelText == "Output")
+    {
+        slider.textFromValueFunction = [](double value)
+        {
+            return juce::String(value, 1) + " dB";
+        };
+    }
+    else
+    {
+        slider.textFromValueFunction = [](double value)
+        {
+            return juce::String(static_cast<int> (std::round(value * 100.0))) + "%";
+        };
+    }
     slider.setColour(juce::Slider::rotarySliderFillColourId, theme::accent);
     slider.setColour(juce::Slider::rotarySliderOutlineColourId, theme::border);
-    slider.setColour(juce::Slider::thumbColourId, theme::accent);
+    slider.setColour(juce::Slider::thumbColourId, theme::text.withAlpha(0.78f));
+    slider.setColour(juce::Slider::trackColourId, theme::accent);
+    slider.setColour(juce::Slider::backgroundColourId, theme::border.withAlpha(0.65f));
     slider.setColour(juce::Slider::textBoxTextColourId, theme::text);
-    slider.setColour(juce::Slider::textBoxBackgroundColourId, theme::panelRaised);
-    slider.setColour(juce::Slider::textBoxOutlineColourId, theme::border);
+    slider.setColour(juce::Slider::textBoxBackgroundColourId, theme::panelInset);
+    slider.setColour(juce::Slider::textBoxOutlineColourId, theme::border.withAlpha(0.72f));
     addAndMakeVisible(slider);
 }
 
@@ -1079,9 +1446,9 @@ void PluginEditor::setupDirectorRemoteSlider(
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 20);
     slider.setColour(juce::Slider::trackColourId, theme::border);
     slider.setColour(juce::Slider::backgroundColourId, theme::panelRaised);
-    slider.setColour(juce::Slider::thumbColourId, theme::accent);
+    slider.setColour(juce::Slider::thumbColourId, theme::text.withAlpha(0.78f));
     slider.setColour(juce::Slider::textBoxTextColourId, theme::text);
-    slider.setColour(juce::Slider::textBoxBackgroundColourId, theme::panelRaised);
+    slider.setColour(juce::Slider::textBoxBackgroundColourId, theme::panelInset);
     slider.setColour(juce::Slider::textBoxOutlineColourId, theme::border);
     addAndMakeVisible(slider);
 }
@@ -1091,7 +1458,7 @@ void PluginEditor::setupButton(juce::TextButton& button)
     button.setColour(juce::TextButton::buttonColourId, theme::panelRaised);
     button.setColour(juce::TextButton::buttonOnColourId, theme::accent.withAlpha(0.5f));
     button.setColour(juce::TextButton::textColourOffId, theme::text);
-    button.setColour(juce::TextButton::textColourOnId, theme::text);
+    button.setColour(juce::TextButton::textColourOnId, theme::textOnDisplay);
     addAndMakeVisible(button);
 }
 
@@ -1100,9 +1467,9 @@ void PluginEditor::setupLinkGroupEditor()
     linkGroupEditor.setInputRestrictions(2, "0123456789");
     linkGroupEditor.setJustification(juce::Justification::centred);
     linkGroupEditor.setSelectAllWhenFocused(true);
-    linkGroupEditor.setColour(juce::TextEditor::backgroundColourId, theme::panelRaised);
+    linkGroupEditor.setColour(juce::TextEditor::backgroundColourId, theme::panelInset);
     linkGroupEditor.setColour(juce::TextEditor::textColourId, theme::text);
-    linkGroupEditor.setColour(juce::TextEditor::outlineColourId, theme::border);
+    linkGroupEditor.setColour(juce::TextEditor::outlineColourId, theme::borderDark.withAlpha(0.55f));
     linkGroupEditor.setColour(juce::TextEditor::focusedOutlineColourId, theme::accent);
     linkGroupEditor.setColour(juce::TextEditor::highlightColourId, theme::accent.withAlpha(0.35f));
     linkGroupEditor.setColour(juce::TextEditor::highlightedTextColourId, theme::text);
@@ -1133,6 +1500,16 @@ void PluginEditor::layoutLabeledCombo(juce::Label& label, juce::ComboBox& combo,
 
     if (bounds.isEmpty())
         return;
+
+    if (combo.getComponentID() == "headerCombo")
+    {
+        label.setFont(juce::FontOptions { 10.5f, juce::Font::bold });
+        label.setColour(juce::Label::textColourId, juce::Colour { 0xff67eaf2 }.withAlpha(0.85f));
+    }
+    else
+    {
+        label.setFont(juce::FontOptions { combo.getComponentID() == "miniCombo" ? 8.5f : 11.0f });
+    }
 
     label.setBounds(bounds.removeFromTop(20));
     combo.setBounds(bounds);
@@ -1352,16 +1729,20 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     widthLabel.setVisible(shouldBeVisible);
     depthLabel.setVisible(shouldBeVisible);
     motionLabel.setVisible(shouldBeVisible);
+    motionPresetLabel.setVisible(shouldBeVisible);
     cleanUpLabel.setVisible(shouldBeVisible);
     resonanceLabel.setVisible(shouldBeVisible);
+    doubleLabel.setVisible(shouldBeVisible);
     outputLabel.setVisible(shouldBeVisible);
     sidechainAmountLabel.setVisible(shouldBeVisible);
 
     widthSlider.setVisible(shouldBeVisible);
     depthSlider.setVisible(shouldBeVisible);
     motionSlider.setVisible(shouldBeVisible);
+    motionPresetCombo.setVisible(shouldBeVisible);
     cleanUpSlider.setVisible(shouldBeVisible);
     resonanceSlider.setVisible(shouldBeVisible);
+    doubleSlider.setVisible(shouldBeVisible);
     outputSlider.setVisible(shouldBeVisible);
     sidechainAmountSlider.setVisible(shouldBeVisible);
 
@@ -1403,14 +1784,49 @@ void PluginEditor::updateDirectorView()
     directorGroupsLabel.setColour(juce::Label::textColourId, hasAnyLinkedGroup ? theme::textMuted : theme::warning);
 
     const auto rideMemory = processor.getRideMemorySnapshot();
+    const auto rideTimelineMemory = processor.getRideTimelineSnapshot();
+    const auto transport = processor.getTransportSnapshot();
     auto resolvedMemoryCount = 0;
     for (const auto& event : rideMemory.events)
         if (event.used && event.resolved)
             ++resolvedMemoryCount;
 
+    auto resolvedTimelineCount = 0;
+    auto groupTimelineCount = 0;
+    auto nearbyTimelineCount = 0;
+    const auto* nearestTimelineEvent = static_cast<const RideTimelineEvent*> (nullptr);
+    auto nearestTimelineDistance = 1.0e9;
+    const auto* latestTimelineEvent = static_cast<const RideTimelineEvent*> (nullptr);
+    for (const auto& event : rideTimelineMemory.events)
+    {
+        if (! event.used || event.group != group)
+            continue;
+
+        ++groupTimelineCount;
+
+        if (event.resolved)
+            ++resolvedTimelineCount;
+
+        if (transport.valid && event.contains(transport.ppqPosition, rideTimelineMergeWindowPpq))
+            ++nearbyTimelineCount;
+
+        if (transport.valid)
+        {
+            const auto distance = std::abs(event.lastSeenPpq - transport.ppqPosition);
+            if (distance < nearestTimelineDistance)
+            {
+                nearestTimelineDistance = distance;
+                nearestTimelineEvent = &event;
+            }
+        }
+
+        if (latestTimelineEvent == nullptr || event.lastSeenPpq > latestTimelineEvent->lastSeenPpq)
+            latestTimelineEvent = &event;
+    }
+
     const auto autoMode = autoAssistModeFromIndex(static_cast<int> (currentParameterValue(parameters::ids::autoAssistMode)));
     juce::String memoryText;
-    if (rideMemory.learning)
+    if (rideMemory.learning || rideTimelineMemory.learning)
         memoryText = "Memory learning\n";
     else if (autoMode == AutoAssistMode::Auto)
         memoryText = "Memory auto\n";
@@ -1419,12 +1835,25 @@ void PluginEditor::updateDirectorView()
 
     memoryText += juce::String(rideMemory.count)
         + " events, " + juce::String(resolvedMemoryCount) + " resolved";
+    memoryText += "\nTimeline " + juce::String(groupTimelineCount)
+        + " / " + juce::String(resolvedTimelineCount) + " resolved";
+    memoryText += transport.valid
+        ? "\n" + ppqText(transport.ppqPosition)
+            + (transport.playing ? " play" : " stop")
+            + ", " + juce::String(nearbyTimelineCount) + " nearby"
+        : "\nPPQ unavailable";
+
+    if (const auto* eventToShow = nearestTimelineEvent != nullptr ? nearestTimelineEvent : latestTimelineEvent)
+        memoryText += "\n" + timelineEventText(*eventToShow);
     directorMemoryLabel.setText(memoryText, juce::dontSendNotification);
     directorMemoryLabel.setColour(
         juce::Label::textColourId,
-        rideMemory.count > 0 || rideMemory.learning ? theme::accent : theme::textMuted);
+        rideMemory.count > 0 || rideTimelineMemory.count > 0 || rideMemory.learning || rideTimelineMemory.learning
+            ? theme::accent
+            : theme::textMuted);
     directorLearnMixButton.setButtonText(rideMemory.learning ? "Learning" : "Learn Mix");
-    directorClearMemoryButton.setEnabled(rideMemory.count > 0 || rideMemory.learning);
+    directorClearMemoryButton.setEnabled(
+        rideMemory.count > 0 || rideTimelineMemory.count > 0 || rideMemory.learning || rideTimelineMemory.learning);
 
     if (group != directorConflictGroup)
     {

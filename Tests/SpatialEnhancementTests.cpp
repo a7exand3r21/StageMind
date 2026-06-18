@@ -2,6 +2,7 @@
 #include "../Source/DSP/MotionProcessor.h"
 #include "../Source/DSP/PseudoDoubleProcessor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -26,6 +27,15 @@ void fillOppositeSideSignal(juce::AudioBuffer<float>& buffer)
     {
         buffer.setSample(0, sample, 0.5f);
         buffer.setSample(1, sample, -0.5f);
+    }
+}
+
+void fillCenteredSignal(juce::AudioBuffer<float>& buffer)
+{
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        buffer.setSample(0, sample, 0.5f);
+        buffer.setSample(1, sample, 0.5f);
     }
 }
 
@@ -103,11 +113,7 @@ void motionMovesCenteredSignalWhenEnabled()
     processor.prepare(testSampleRate, testBlockSize);
 
     juce::AudioBuffer<float> buffer(2, testBlockSize);
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-    {
-        buffer.setSample(0, sample, 0.5f);
-        buffer.setSample(1, sample, 0.5f);
-    }
+    fillCenteredSignal(buffer);
 
     stagemind::MotionConfig config;
     config.amount = 1.0f;
@@ -117,6 +123,35 @@ void motionMovesCenteredSignalWhenEnabled()
         processor.process(buffer, config);
 
     expect(maxStereoDifference(buffer) > 0.001f, "motion should create audible left-right movement on centered material");
+}
+
+void motionPresetChangesMovementShape()
+{
+    stagemind::MotionProcessor slowProcessor;
+    stagemind::MotionProcessor sweepProcessor;
+    slowProcessor.prepare(testSampleRate, testBlockSize);
+    sweepProcessor.prepare(testSampleRate, testBlockSize);
+
+    juce::AudioBuffer<float> slowBuffer(2, testBlockSize);
+    juce::AudioBuffer<float> sweepBuffer(2, testBlockSize);
+    fillCenteredSignal(slowBuffer);
+    fillCenteredSignal(sweepBuffer);
+
+    stagemind::MotionConfig slowConfig;
+    slowConfig.amount = 1.0f;
+    slowConfig.rateHz = 1.0f;
+    slowConfig.preset = 0;
+
+    stagemind::MotionConfig sweepConfig = slowConfig;
+    sweepConfig.preset = 3;
+
+    for (int i = 0; i < 8; ++i)
+    {
+        slowProcessor.process(slowBuffer, slowConfig);
+        sweepProcessor.process(sweepBuffer, sweepConfig);
+    }
+
+    expect(maxDifference(slowBuffer, sweepBuffer) > 0.001f, "motion presets should produce distinct movement");
 }
 
 void depthZeroAmountLeavesBufferUntouched()
@@ -159,6 +194,36 @@ void depthPositiveAmountChangesBuffer()
         processor.process(buffer, config);
 
     expect(maxDifference(buffer, reference) > 0.001f, "positive depth amount should alter tone or reflections");
+}
+
+void depthAddsEarlyRoomReflection()
+{
+    stagemind::DepthProcessor processor;
+    processor.prepare(testSampleRate, testBlockSize);
+
+    juce::AudioBuffer<float> buffer(2, testBlockSize);
+    buffer.clear();
+    buffer.setSample(0, 0, 1.0f);
+    buffer.setSample(1, 0, 1.0f);
+
+    stagemind::DepthConfig config;
+    config.amount = 1.0f;
+    config.presenceReduction = 0.35f;
+    config.earlyReflectionAmount = 1.0f;
+    processor.process(buffer, config);
+
+    expect(buffer.getSample(0, 0) > 0.99f, "depth should keep the dry impulse zero-latency");
+    expect(buffer.getSample(1, 0) > 0.99f, "depth should keep the dry impulse zero-latency");
+
+    bool foundRoomTail = false;
+    for (int sample = 350; sample < buffer.getNumSamples(); ++sample)
+    {
+        foundRoomTail = foundRoomTail
+            || std::abs(buffer.getSample(0, sample)) > 0.0005f
+            || std::abs(buffer.getSample(1, sample)) > 0.0005f;
+    }
+
+    expect(foundRoomTail, "depth should add early room-like reflections after the dry impulse");
 }
 
 void pseudoDoubleKeepsDryPathUndelayed()
@@ -209,8 +274,10 @@ void runSpatialEnhancementTests()
     motionZeroAmountLeavesBufferUntouched();
     motionChangesAllowedSideSignal();
     motionMovesCenteredSignalWhenEnabled();
+    motionPresetChangesMovementShape();
     depthZeroAmountLeavesBufferUntouched();
     depthPositiveAmountChangesBuffer();
+    depthAddsEarlyRoomReflection();
     pseudoDoubleKeepsDryPathUndelayed();
     pseudoDoubleZeroAmountLeavesBufferUntouched();
 }

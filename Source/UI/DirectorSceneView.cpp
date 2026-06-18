@@ -110,24 +110,53 @@ void DirectorSceneView::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour(theme::panel);
+    juce::DropShadow(theme::shadow, 9, { 0, 3 }).drawForRectangle(g, bounds.toNearestInt());
+    juce::ColourGradient module(
+        theme::panelRaised,
+        bounds.getCentreX(),
+        bounds.getY(),
+        theme::panelInset,
+        bounds.getCentreX(),
+        bounds.getBottom(),
+        false);
+    g.setGradientFill(module);
     g.fillRoundedRectangle(bounds, static_cast<float> (theme::corner));
+    g.setColour(juce::Colours::white.withAlpha(0.74f));
+    g.drawRoundedRectangle(bounds.reduced(1.0f), static_cast<float> (theme::corner), 1.0f);
     g.setColour(theme::border);
     g.drawRoundedRectangle(bounds.reduced(0.5f), static_cast<float> (theme::corner), 1.0f);
 
-    auto stage = getLocalBounds().reduced(22);
-    g.setColour(theme::border.withAlpha(0.8f));
+    auto display = bounds.reduced(14.0f, 18.0f);
+    g.setColour(theme::shadow.withAlpha(0.20f));
+    g.fillRoundedRectangle(display.translated(0.0f, 2.0f), 8.0f);
+    juce::ColourGradient glass(
+        theme::displayRaised,
+        display.getCentreX(),
+        display.getY(),
+        theme::display,
+        display.getCentreX(),
+        display.getBottom(),
+        false);
+    g.setGradientFill(glass);
+    g.fillRoundedRectangle(display, 8.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.08f));
+    g.fillRoundedRectangle(display.reduced(3.0f).withHeight(display.getHeight() * 0.25f), 5.0f);
+    g.setColour(theme::borderDark.withAlpha(0.55f));
+    g.drawRoundedRectangle(display.reduced(0.5f), 8.0f, 1.0f);
+
+    auto stage = display.toNearestInt().reduced(22);
+    g.setColour(theme::textOnDisplay.withAlpha(0.22f));
     g.drawHorizontalLine(stage.getCentreY(), static_cast<float> (stage.getX()), static_cast<float> (stage.getRight()));
     g.drawVerticalLine(stage.getCentreX(), static_cast<float> (stage.getY()), static_cast<float> (stage.getBottom()));
 
-    g.setColour(theme::textMuted);
+    g.setColour(theme::textOnDisplay.withAlpha(0.72f));
     g.setFont(juce::FontOptions { 12.0f });
     g.drawText("Back", stage.removeFromTop(18), juce::Justification::centredRight);
-    g.drawText("Front", getLocalBounds().reduced(22).removeFromBottom(18), juce::Justification::centredRight);
+    g.drawText("Front", display.toNearestInt().reduced(22).removeFromBottom(18), juce::Justification::centredRight);
 
     if (snapshot.count <= 0)
     {
-        g.setColour(theme::textMuted);
+        g.setColour(theme::textOnDisplay.withAlpha(0.72f));
         g.setFont(juce::FontOptions { 15.0f });
         g.drawText("No linked Nodes in this group", getLocalBounds(), juce::Justification::centred);
         return;
@@ -168,7 +197,7 @@ void DirectorSceneView::paint(juce::Graphics& g)
         g.setColour(colour.withAlpha(connection.active ? 0.78f : 0.42f));
         g.drawArrow(line, connection.active ? 2.2f : 1.4f, 9.0f, 12.0f);
 
-        g.setColour(theme::panelRaised.withAlpha(0.92f));
+        g.setColour(theme::panelRaised.withAlpha(0.95f));
         const auto badge = juce::Rectangle<float> { midpoint.x - 42.0f, midpoint.y - 10.0f, 84.0f, 20.0f };
         g.fillRoundedRectangle(badge, 5.0f);
         g.setColour(colour);
@@ -208,7 +237,7 @@ void DirectorSceneView::paint(juce::Graphics& g)
         g.setColour(colour);
         g.fillEllipse(x - radius, y - radius, radius * 2.0f, radius * 2.0f);
 
-        g.setColour(theme::text);
+        g.setColour(theme::textOnDisplay);
         g.setFont(juce::FontOptions { 11.0f, juce::Font::bold });
         g.drawText(
             "#" + juce::String(node.instanceId) + " " + shortRoleLabel(role),

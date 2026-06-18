@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(StageMind VERSION 0.8.9 LANGUAGES C CXX)
+project(StageMind VERSION 0.9.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -59,6 +59,7 @@ target_sources(StageMindNode
         Source/DSP/SideHighPassProcessor.cpp
         Source/DSP/SpatialProcessor.cpp
         Source/UI/DirectorSceneView.cpp
+        Source/UI/HardwareLookAndFeel.cpp
         Source/UI/MeterView.cpp
         Source/UI/ResonanceListView.cpp
         Source/UI/StageView.cpp
@@ -86,6 +87,7 @@ add_executable(StageMindDSPTests
     Tests/LinkSuggestionEngineTests.cpp
     Tests/ResonanceDetectorTests.cpp
     Tests/RideMemoryTests.cpp
+    Tests/RideTimelineMemoryTests.cpp
     Tests/StageMindLinkRegistryTests.cpp
     Tests/SpatialEnhancementTests.cpp
     Source/Link/LinkActivityEnvelope.cpp

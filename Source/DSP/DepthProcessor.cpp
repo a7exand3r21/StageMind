@@ -8,8 +8,16 @@ namespace stagemind
 void DepthProcessor::prepare(double sampleRate, int)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
-    delayBufferSize = std::max(1, static_cast<int> (currentSampleRate * 0.04));
+    delayBufferSize = std::max(1, static_cast<int> (currentSampleRate * 0.09));
     reflectionDelaySamples = std::max(1, static_cast<int> (currentSampleRate * 0.012));
+    feedbackDelaySamples = std::max(1, static_cast<int> (currentSampleRate * 0.047));
+    reflectionTapSamples = {
+        std::max(1, static_cast<int> (currentSampleRate * 0.0085)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0140)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0235)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0370))
+    };
+    reflectionTapGains = { 0.48f, 0.34f, 0.24f, 0.16f };
     delayBuffer.setSize(maxChannels, delayBufferSize, false, true, false);
     amount.reset(currentSampleRate, 0.08);
     presenceReduction.reset(currentSampleRate, 0.08);
@@ -46,8 +54,9 @@ void DepthProcessor::process(juce::AudioBuffer<float>& buffer, const DepthConfig
         const auto depth = amount.getNextValue();
         const auto presenceCut = presenceReduction.getNextValue();
         const auto wetAmount = earlyReflectionAmount.getNextValue();
-        const auto dryScale = 1.0f - depth * 0.05f;
-        const auto wetGain = depth * wetAmount * 0.12f;
+        const auto dryScale = 1.0f - depth * 0.14f;
+        const auto wetGain = depth * wetAmount * (0.08f + depth * 0.18f);
+        const auto feedbackGain = depth * wetAmount * 0.16f;
 
         std::array<float, maxChannels> dry {};
 
@@ -64,15 +73,27 @@ void DepthProcessor::process(juce::AudioBuffer<float>& buffer, const DepthConfig
 
         for (int channel = 0; channel < numChannels; ++channel)
         {
-            const auto sourceChannel = numChannels > 1 ? 1 - channel : channel;
-            auto wet = readDelay(sourceChannel, reflectionDelaySamples);
+            auto wet = readDelay(channel, reflectionDelaySamples) * 0.22f;
+
+            for (int tap = 0; tap < reflectionTapCount; ++tap)
+            {
+                const auto sourceChannel = numChannels > 1 && tap % 2 == 0 ? 1 - channel : channel;
+                const auto polarity = tap == 1 ? -1.0f : 1.0f;
+                wet += readDelay(sourceChannel, reflectionTapSamples[static_cast<size_t> (tap)])
+                    * reflectionTapGains[static_cast<size_t> (tap)]
+                    * polarity;
+            }
+
             wetLowState[static_cast<size_t> (channel)] += dampingCoefficient * (wet - wetLowState[static_cast<size_t> (channel)]);
             wet = wetLowState[static_cast<size_t> (channel)];
             buffer.getWritePointer(channel)[sample] += wet * wetGain;
         }
 
         for (int channel = 0; channel < numChannels; ++channel)
-            writeDelay(channel, dry[static_cast<size_t> (channel)]);
+        {
+            const auto feedback = readDelay(channel, feedbackDelaySamples) * feedbackGain;
+            writeDelay(channel, dry[static_cast<size_t> (channel)] + feedback);
+        }
 
         ++writePosition;
         if (writePosition >= delayBufferSize)
