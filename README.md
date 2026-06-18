@@ -13,11 +13,9 @@ requires prior written permission from the author. See `LICENSE`.
 
 ## MVP Status
 
-Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.9.1 adds Room Depth v1, Motion presets, a visible Double control, and the first hardware-style UI preview.
+Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.9.2 makes the Character controls more audible: Clean Up now has its own role-aware tone path, Resonance rides more decisively, and Double uses stronger asymmetric micro-taps.
 
-Design branch: `codex/light-hardware-ui`.
-
-This branch explores a bright hardware processor interface: rounded white chassis, dark glass selector strip, five vertical modules, cyan glow accents, segmented meters, dotted Stage View grid, and custom knob/dropdown/button styling. The DSP and automation behavior are still the same StageMind Node plugin.
+Current UI direction: bright hardware processor interface with a rounded white chassis, dark glass selector strip, five vertical modules, cyan glow accents, segmented meters, dotted Stage View grid, and custom knob/dropdown/button styling.
 
 Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.5.5 RC note: `docs/STAGEMIND_NODE_0_5_5_RC.md`.
@@ -44,6 +42,7 @@ Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.8.9 RC note: `docs/STAGEMIND_NODE_0_8_9_RC.md`.
 0.9.0 RC note: `docs/STAGEMIND_NODE_0_9_0_RC.md`.
 0.9.1 RC note: `docs/STAGEMIND_NODE_0_9_1_RC.md`.
+0.9.2 RC note: `docs/STAGEMIND_NODE_0_9_2_RC.md`.
 
 Implemented in this repository:
 
@@ -223,7 +222,7 @@ Resonance cleanup:
 3. Press `Learn` while the busy part of the track is playing.
 4. Wait until the button changes to `Relearn`.
 5. Raise `Resonance` to increase suppression amount.
-6. Raise `Clean Up` if the detector is not finding enough narrow peaks.
+6. Raise `Clean Up` for role-aware tone cleanup; it also makes resonance suppression a little more assertive.
 7. Watch `Resonances` on the right side of the GUI.
 8. Keep defaults gentle if the source starts losing tone.
 
@@ -241,7 +240,7 @@ Motion / depth / double:
 1. Use `Motion` gently on pads, FX, percussion, and wide background parts.
 2. Choose a `Motion Preset`: `Slow Drift` is subtle, `Orbit` moves wider, `Pulse` is faster, `Wide Sweep` gives the widest left/right movement.
 3. Use `Depth` to push a part slightly back with early room-like reflections.
-4. Use `Double` when the selected role allows pseudo-doubling. It is role-limited and off by default.
+4. Use `Double` when the selected role allows pseudo-doubling. It now uses asymmetric micro-taps, so mono guitars/vocals should become audibly wider or thicker.
 5. Mono Safe reduces or disables risky widening behavior.
 6. If correlation drops below the active safety threshold, StageMind gradually reduces width, motion, and double.
 

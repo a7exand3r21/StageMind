@@ -200,6 +200,48 @@ void suppressesArtificialPeak()
     expect(after < before * 0.98f, "dynamic EQ should reduce the resonant sine");
 }
 
+void higherResonanceAmountCutsMore()
+{
+    stagemind::DynamicEQ lowAmountEQ;
+    stagemind::DynamicEQ highAmountEQ;
+    lowAmountEQ.prepare(testSampleRate, blockSize);
+    highAmountEQ.prepare(testSampleRate, blockSize);
+
+    stagemind::ResonanceSnapshot snapshot;
+    snapshot.peakCount = 1;
+    snapshot.peaks[0].frequencyHz = 3000.0f;
+    snapshot.peaks[0].severity = 1.0f;
+    snapshot.peaks[0].suggestedQ = 8.0f;
+    snapshot.peaks[0].suggestedReductionDb = 5.0f;
+
+    stagemind::ResonanceSuppressionConfig lowConfig;
+    lowConfig.resonanceAmount = 0.30f;
+    lowConfig.maxReductionDb = 5.0f;
+    lowConfig.attackMs = 1.0f;
+    lowConfig.releaseMs = 80.0f;
+
+    stagemind::ResonanceSuppressionConfig highConfig = lowConfig;
+    highConfig.resonanceAmount = 1.25f;
+    highConfig.maxReductionDb = 7.0f;
+
+    juce::AudioBuffer<float> lowBuffer(2, blockSize);
+    juce::AudioBuffer<float> highBuffer(2, blockSize);
+    float lowAfter = 0.0f;
+    float highAfter = 0.0f;
+
+    for (int block = 0; block < 24; ++block)
+    {
+        fillStereoSine(lowBuffer, 3000.0f, block * blockSize, 0.6f);
+        highBuffer.makeCopyOf(lowBuffer);
+        lowAmountEQ.processResonances(lowBuffer, snapshot, lowConfig);
+        highAmountEQ.processResonances(highBuffer, snapshot, highConfig);
+        lowAfter = rms(lowBuffer);
+        highAfter = rms(highBuffer);
+    }
+
+    expect(highAfter < lowAfter * 0.93f, "higher resonance amount should produce stronger reduction");
+}
+
 void zeroAmountLeavesFreshBufferUntouched()
 {
     stagemind::DynamicEQ dynamicEQ;
@@ -324,6 +366,7 @@ int main()
     lowFrequencyMaterialDoesNotReadPastFftEdges();
     capsResonancesAtFourPeaks();
     suppressesArtificialPeak();
+    higherResonanceAmountCutsMore();
     zeroAmountLeavesFreshBufferUntouched();
     learnerHoldsFlickeringLivePeaks();
     learnerCapturesStableCorrections();

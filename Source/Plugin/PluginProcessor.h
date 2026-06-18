@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../DSP/CleanUpProcessor.h"
 #include "../DSP/CorrelationMeter.h"
 #include "../DSP/DepthProcessor.h"
 #include "../DSP/DynamicEQ.h"
@@ -90,6 +91,7 @@ private:
     void renderSidechainListen(const juce::AudioBuffer<float>& sidechainBuffer, juce::AudioBuffer<float>& mainBuffer) noexcept;
     SidechainAnalysis makeEffectiveSidechainAnalysis(const SidechainAnalysis& externalSidechain) const noexcept;
     SidechainDynamicEQConfig makeSidechainEQConfig() const noexcept;
+    CleanUpConfig makeCleanUpConfig(const RoleProfile& profile, TrackRole role) const noexcept;
     ResonanceDetectorConfig makeResonanceDetectorConfig() const noexcept;
     ResonanceSuppressionConfig makeResonanceSuppressionConfig() const noexcept;
     MotionConfig makeMotionConfig(const RoleProfile& profile, SafetyMode safety) const noexcept;
@@ -140,6 +142,7 @@ private:
     SpatialProcessor spatialProcessor;
     MotionProcessor motionProcessor;
     DepthProcessor depthProcessor;
+    CleanUpProcessor cleanUpProcessor;
     PseudoDoubleProcessor pseudoDoubleProcessor;
     CorrelationMeter correlationMeter;
     ResonanceDetector resonanceDetector;

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(StageMind VERSION 0.9.1 LANGUAGES C CXX)
+project(StageMind VERSION 0.9.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,6 +44,7 @@ target_sources(StageMindNode
         Source/Model/Parameters.cpp
         Source/Model/PluginState.cpp
         Source/Model/RolePresetEngine.cpp
+        Source/DSP/CleanUpProcessor.cpp
         Source/DSP/CorrelationMeter.cpp
         Source/DSP/DepthProcessor.cpp
         Source/DSP/DynamicEQ.cpp
@@ -93,6 +94,7 @@ add_executable(StageMindDSPTests
     Source/Link/LinkActivityEnvelope.cpp
     Source/Link/StageMindLinkRegistry.cpp
     Source/Link/LinkSuggestionEngine.cpp
+    Source/DSP/CleanUpProcessor.cpp
     Source/DSP/DepthProcessor.cpp
     Source/DSP/DynamicEQ.cpp
     Source/DSP/LinkSpectralAnalyzer.cpp

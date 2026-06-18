@@ -29,6 +29,7 @@ Link does not transfer audio between instances. It only shares control data:
 - Role selector.
 - Width, depth, motion, motion preset, clean-up, resonance, double, output gain.
 - Role-limited motion and pseudo-double behavior.
+- Character DSP v2: role-aware Clean Up tone shaping, stronger resonance riding, and asymmetric pseudo-double taps.
 - Room Depth v1: zero-latency dry path with damped early reflections and short feedback.
 - Zero-latency dry path.
 - Correlation safety for risky width.
@@ -45,6 +46,7 @@ Link does not transfer audio between instances. It only shares control data:
 
 - Room Depth v1 is not HRTF, not binaural 3D, and not late-room convolution.
 - Motion is subtle and role-limited.
+- Clean Up, Resonance, and Double are still mix-starting tools, not full restoration, de-essing, or dedicated chorus/reverb modules.
 - Sidechain routing inside FL Studio remains manual.
 - Link is control-data only.
 - Director depends on Nodes publishing their state.

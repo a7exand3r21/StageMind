@@ -22,7 +22,7 @@ Use this before distributing any build.
 - [ ] Presets load correctly.
 - [ ] Automation writes and reads correctly.
 - [ ] No parameter ID was renamed accidentally.
-- [ ] StageMind Node 0.9.1 metadata/version is visible in the UI and VST3 module info.
+- [ ] StageMind Node 0.9.2 metadata/version is visible in the UI and VST3 module info.
 
 ## Audio
 

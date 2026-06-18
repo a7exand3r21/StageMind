@@ -1,3 +1,4 @@
+#include "../Source/DSP/CleanUpProcessor.h"
 #include "../Source/DSP/DepthProcessor.h"
 #include "../Source/DSP/MotionProcessor.h"
 #include "../Source/DSP/PseudoDoubleProcessor.h"
@@ -11,6 +12,7 @@ namespace
 {
 constexpr double testSampleRate = 48000.0;
 constexpr int testBlockSize = 2048;
+constexpr float twoPi = juce::MathConstants<float>::twoPi;
 
 void expect(bool condition, const char* message)
 {
@@ -36,6 +38,17 @@ void fillCenteredSignal(juce::AudioBuffer<float>& buffer)
     {
         buffer.setSample(0, sample, 0.5f);
         buffer.setSample(1, sample, 0.5f);
+    }
+}
+
+void fillCenteredSine(juce::AudioBuffer<float>& buffer, float frequencyHz, int startSample)
+{
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        const auto phase = twoPi * frequencyHz * static_cast<float> (startSample + sample) / static_cast<float> (testSampleRate);
+        const auto value = std::sin(phase) * 0.5f;
+        buffer.setSample(0, sample, value);
+        buffer.setSample(1, sample, value);
     }
 }
 
@@ -226,6 +239,55 @@ void depthAddsEarlyRoomReflection()
     expect(foundRoomTail, "depth should add early room-like reflections after the dry impulse");
 }
 
+void cleanUpZeroAmountLeavesBufferUntouched()
+{
+    stagemind::CleanUpProcessor processor;
+    processor.prepare(testSampleRate, testBlockSize);
+
+    juce::AudioBuffer<float> buffer(2, testBlockSize);
+    fillOppositeSideSignal(buffer);
+
+    juce::AudioBuffer<float> reference;
+    reference.makeCopyOf(buffer);
+
+    stagemind::CleanUpConfig config;
+    config.amount = 0.0f;
+    processor.process(buffer, config);
+
+    expect(maxDifference(buffer, reference) < 1.0e-6f, "zero clean-up amount should leave buffer untouched");
+}
+
+void cleanUpPositiveAmountChangesTone()
+{
+    stagemind::CleanUpProcessor processor;
+    processor.prepare(testSampleRate, testBlockSize);
+
+    juce::AudioBuffer<float> buffer(2, testBlockSize);
+    juce::AudioBuffer<float> reference(2, testBlockSize);
+
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        const auto phaseLowMid = twoPi * 420.0f * static_cast<float> (sample) / static_cast<float> (testSampleRate);
+        const auto phaseHarsh = twoPi * 3600.0f * static_cast<float> (sample) / static_cast<float> (testSampleRate);
+        const auto value = std::sin(phaseLowMid) * 0.35f + std::sin(phaseHarsh) * 0.25f;
+        buffer.setSample(0, sample, value);
+        buffer.setSample(1, sample, value);
+    }
+
+    reference.makeCopyOf(buffer);
+
+    stagemind::CleanUpConfig config;
+    config.amount = 1.0f;
+    config.lowMidReduction = 0.20f;
+    config.harshReduction = 0.18f;
+    config.airLift = 0.0f;
+
+    for (int i = 0; i < 4; ++i)
+        processor.process(buffer, config);
+
+    expect(maxDifference(buffer, reference) > 0.001f, "positive clean-up amount should alter tone");
+}
+
 void pseudoDoubleKeepsDryPathUndelayed()
 {
     stagemind::PseudoDoubleProcessor processor;
@@ -248,6 +310,24 @@ void pseudoDoubleKeepsDryPathUndelayed()
         foundWetDelay = foundWetDelay || buffer.getSample(0, sample) > 0.015f || buffer.getSample(1, sample) > 0.015f;
 
     expect(foundWetDelay, "pseudo-double should add delayed wet signal after the dry impulse");
+}
+
+void pseudoDoubleCreatesStereoDifferenceOnMonoSine()
+{
+    stagemind::PseudoDoubleProcessor processor;
+    processor.prepare(testSampleRate, testBlockSize);
+
+    juce::AudioBuffer<float> buffer(2, testBlockSize);
+    stagemind::PseudoDoubleConfig config;
+    config.amount = 1.0f;
+
+    for (int block = 0; block < 12; ++block)
+    {
+        fillCenteredSine(buffer, 440.0f, block * testBlockSize);
+        processor.process(buffer, config);
+    }
+
+    expect(maxStereoDifference(buffer) > 0.004f, "pseudo-double should create stereo difference on mono pitched material");
 }
 
 void pseudoDoubleZeroAmountLeavesBufferUntouched()
@@ -278,6 +358,9 @@ void runSpatialEnhancementTests()
     depthZeroAmountLeavesBufferUntouched();
     depthPositiveAmountChangesBuffer();
     depthAddsEarlyRoomReflection();
+    cleanUpZeroAmountLeavesBufferUntouched();
+    cleanUpPositiveAmountChangesTone();
     pseudoDoubleKeepsDryPathUndelayed();
+    pseudoDoubleCreatesStereoDifferenceOnMonoSine();
     pseudoDoubleZeroAmountLeavesBufferUntouched();
 }

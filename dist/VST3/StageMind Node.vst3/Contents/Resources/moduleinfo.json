@@ -1,6 +1,6 @@
 {
   "Name": "StageMind Node",
-  "Version": "0.9.1",
+  "Version": "0.9.2",
   "Factory Info": {
     "Vendor": "StageMind",
     "URL": "",
@@ -17,7 +17,7 @@
       "Category": "Audio Module Class",
       "Name": "StageMind Node",
       "Vendor": "StageMind",
-      "Version": "0.9.1",
+      "Version": "0.9.2",
       "SDKVersion": "VST 3.8.0",
       "Sub Categories": [
         "Fx",
@@ -32,7 +32,7 @@
       "Category": "Component Controller Class",
       "Name": "StageMind Node",
       "Vendor": "StageMind",
-      "Version": "0.9.1",
+      "Version": "0.9.2",
       "SDKVersion": "VST 3.8.0",
       "Sub Categories": [
         "Fx",

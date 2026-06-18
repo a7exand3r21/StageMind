@@ -206,6 +206,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     spatialProcessor.prepare(sampleRate, samplesPerBlock);
     motionProcessor.prepare(sampleRate, samplesPerBlock);
     depthProcessor.prepare(sampleRate, samplesPerBlock);
+    cleanUpProcessor.prepare(sampleRate, samplesPerBlock);
     pseudoDoubleProcessor.prepare(sampleRate, samplesPerBlock);
     resonanceDetector.prepare(sampleRate, samplesPerBlock);
     resonanceLearner.prepare(sampleRate);
@@ -227,6 +228,7 @@ void PluginProcessor::releaseResources()
     publishDisabledLinkState();
     motionProcessor.reset();
     depthProcessor.reset();
+    cleanUpProcessor.reset();
     pseudoDoubleProcessor.reset();
     sidechainDetector.reset();
     sidechainDynamicEQ.reset();
@@ -305,6 +307,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     applyCorrelationSafety(spatialParams);
     const auto motionConfig = makeMotionConfig(profile, safety);
     const auto depthConfig = makeDepthConfig(profile, safety);
+    const auto cleanUpConfig = makeCleanUpConfig(profile, role);
     const auto pseudoDoubleConfig = makePseudoDoubleConfig(profile, safety);
     publishStageState(spatialParams, depthConfig, motionConfig, profile.allowMotion);
 
@@ -339,6 +342,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     spatialProcessor.process(mainBuffer);
     motionProcessor.process(mainBuffer, motionConfig);
     depthProcessor.process(mainBuffer, depthConfig);
+    cleanUpProcessor.process(mainBuffer, cleanUpConfig);
     pseudoDoubleProcessor.process(mainBuffer, pseudoDoubleConfig);
 
     const auto effectiveSidechain = makeEffectiveSidechainAnalysis(sidechain);
@@ -1160,6 +1164,102 @@ SidechainDynamicEQConfig PluginProcessor::makeSidechainEQConfig() const noexcept
     return config;
 }
 
+CleanUpConfig PluginProcessor::makeCleanUpConfig(const RoleProfile& profile, TrackRole role) const noexcept
+{
+    CleanUpConfig config;
+    config.amount = rawValue(parameters::ids::cleanUp);
+    config.lowMidReduction = 0.10f + profile.cleanUpAmount * 0.10f;
+    config.harshReduction = 0.08f + profile.resonanceSensitivity * 0.10f;
+    config.airLift = profile.protectLowEnd ? 0.0f : 0.018f + profile.cleanUpAmount * 0.035f;
+
+    switch (role)
+    {
+        case TrackRole::LeadVocal:
+        case TrackRole::BackingVocal:
+        case TrackRole::SunoVocal:
+            config.lowMidReduction = 0.17f;
+            config.harshReduction = 0.19f;
+            config.airLift = 0.040f;
+            config.lowMidStartHz = 130.0f;
+            config.lowMidEndHz = 760.0f;
+            config.harshStartHz = 2200.0f;
+            config.harshEndHz = 8200.0f;
+            config.airStartHz = 7600.0f;
+            break;
+
+        case TrackRole::Bass:
+        case TrackRole::SynthBass:
+        case TrackRole::SunoBass:
+        case TrackRole::Kick:
+            config.lowMidReduction = 0.10f;
+            config.harshReduction = 0.055f;
+            config.airLift = 0.0f;
+            config.lowMidStartHz = 170.0f;
+            config.lowMidEndHz = 520.0f;
+            config.harshStartHz = 1200.0f;
+            config.harshEndHz = 4200.0f;
+            config.airStartHz = 9000.0f;
+            break;
+
+        case TrackRole::RhythmGuitarSingle:
+        case TrackRole::RhythmGuitarPairLeft:
+        case TrackRole::RhythmGuitarPairRight:
+        case TrackRole::LeadGuitar:
+        case TrackRole::SunoGuitar:
+        case TrackRole::Piano:
+            config.lowMidReduction = 0.18f;
+            config.harshReduction = 0.16f;
+            config.airLift = 0.025f;
+            config.lowMidStartHz = 170.0f;
+            config.lowMidEndHz = 920.0f;
+            config.harshStartHz = 2500.0f;
+            config.harshEndHz = 7800.0f;
+            break;
+
+        case TrackRole::Snare:
+        case TrackRole::HiHat:
+        case TrackRole::Percussion:
+        case TrackRole::SunoDrums:
+        case TrackRole::SunoPercussion:
+            config.lowMidReduction = 0.11f;
+            config.harshReduction = 0.14f;
+            config.airLift = 0.020f;
+            config.lowMidStartHz = 180.0f;
+            config.lowMidEndHz = 820.0f;
+            config.harshStartHz = 2800.0f;
+            config.harshEndHz = 9000.0f;
+            break;
+
+        case TrackRole::Pad:
+        case TrackRole::Atmosphere:
+        case TrackRole::FX:
+        case TrackRole::SunoSynthPad:
+        case TrackRole::SunoFX:
+            config.lowMidReduction = 0.12f;
+            config.harshReduction = 0.10f;
+            config.airLift = 0.036f;
+            config.lowMidStartHz = 160.0f;
+            config.lowMidEndHz = 780.0f;
+            config.harshStartHz = 3000.0f;
+            config.harshEndHz = 8600.0f;
+            break;
+
+        default:
+            break;
+    }
+
+    if (profile.protectTransient)
+        config.harshReduction *= 0.82f;
+
+    if (profile.protectLowEnd)
+    {
+        config.lowMidReduction *= 0.78f;
+        config.airLift = 0.0f;
+    }
+
+    return config;
+}
+
 ResonanceDetectorConfig PluginProcessor::makeResonanceDetectorConfig() const noexcept
 {
     ResonanceDetectorConfig config;
@@ -1172,11 +1272,16 @@ ResonanceDetectorConfig PluginProcessor::makeResonanceDetectorConfig() const noe
 ResonanceSuppressionConfig PluginProcessor::makeResonanceSuppressionConfig() const noexcept
 {
     const auto cleanUp = rawValue(parameters::ids::cleanUp);
+    const auto resonance = rawValue(parameters::ids::resonance);
+    const auto characterDrive = resonance * (1.0f + resonance * 0.28f + cleanUp * 0.25f);
     ResonanceSuppressionConfig config;
-    config.resonanceAmount = rawValue(parameters::ids::resonance) * juce::jmap(cleanUp, 0.0f, 1.0f, 0.85f, 1.15f);
-    config.maxReductionDb = rawValue(parameters::ids::maxResonanceReduction);
-    config.attackMs = rawValue(parameters::ids::dynamicEqAttack);
-    config.releaseMs = rawValue(parameters::ids::dynamicEqRelease);
+    config.resonanceAmount = juce::jlimit(0.0f, 1.35f, characterDrive);
+    config.maxReductionDb = juce::jlimit(
+        0.0f,
+        8.0f,
+        rawValue(parameters::ids::maxResonanceReduction) + cleanUp * 1.0f + resonance * 0.5f);
+    config.attackMs = juce::jmax(1.0f, rawValue(parameters::ids::dynamicEqAttack) * juce::jmap(resonance, 0.0f, 1.0f, 1.0f, 0.65f));
+    config.releaseMs = juce::jmax(30.0f, rawValue(parameters::ids::dynamicEqRelease) * juce::jmap(cleanUp, 0.0f, 1.0f, 1.0f, 0.82f));
     return config;
 }
 
