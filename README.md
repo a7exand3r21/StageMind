@@ -17,6 +17,8 @@ Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. St
 
 Current UI direction: bright hardware processor interface with a rounded white chassis, dark glass selector strip, five vertical modules, cyan glow accents, segmented meters, dotted Stage View grid, and custom knob/dropdown/button styling.
 
+![StageMind Node and Director preview](docs/assets/stagemind-node-0.9.2-preview.png)
+
 Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.5.5 RC note: `docs/STAGEMIND_NODE_0_5_5_RC.md`.
 0.5.6 RC note: `docs/STAGEMIND_NODE_0_5_6_RC.md`.
