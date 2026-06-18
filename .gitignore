@@ -9,6 +9,13 @@ out/
 *.user
 *.suo
 
+# Local assistant/workflow files
+.agents/
+AGENTS.md
+README-CODEX-SKILLS.md
+docs/CODEX_WORKFLOW.md
+docs/SESSION_CHECKPOINT_*.md
+
 # Compiler/linker intermediates
 *.obj
 *.pdb
