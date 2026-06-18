@@ -24,6 +24,14 @@ namespace stagemind
 enum class LinkSuggestionKind;
 struct LinkSuggestionAction;
 
+struct TransportPositionSnapshot
+{
+    bool valid = false;
+    bool playing = false;
+    double ppqPosition = 0.0;
+    double bpm = 120.0;
+};
+
 class PluginProcessor final : public juce::AudioProcessor, private juce::Timer
 {
 public:
@@ -60,6 +68,8 @@ public:
     void beginRideMemoryLearn() noexcept;
     void clearRideMemory() noexcept;
     RideMemorySnapshot getRideMemorySnapshot() const noexcept;
+    RideTimelineSnapshot getRideTimelineSnapshot() const noexcept;
+    TransportPositionSnapshot getTransportSnapshot() const noexcept;
 
 private:
     static BusesProperties createBuses();
@@ -67,6 +77,7 @@ private:
 
     void timerCallback() override;
     float rawValue(const char* parameterId) const noexcept;
+    void publishTransportPosition() noexcept;
     void updateDirectorAutoCommands();
     void applyLinkCommand(LinkCommand command);
     void applyPendingAutoAssist();
@@ -141,8 +152,14 @@ private:
     LinkSpectralAnalyzer linkSpectralAnalyzer;
     mutable juce::CriticalSection rideMemoryLock;
     RideMemory rideMemory;
+    mutable juce::CriticalSection rideTimelineMemoryLock;
+    RideTimelineMemory rideTimelineMemory;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outputGain { 1.0f };
+    std::atomic<int> transportPositionValid { 0 };
+    std::atomic<int> transportIsPlaying { 0 };
+    std::atomic<double> transportPpqPosition { 0.0 };
+    std::atomic<double> transportBpm { 120.0 };
     std::atomic<bool> resonanceLearnRequested { false };
     std::atomic<bool> autoResonanceTuningPending { false };
     std::atomic<int> autoPendingLinkActionKind { 0 };

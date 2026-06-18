@@ -23,28 +23,47 @@ void StageView::setState(State newState)
 void StageView::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(theme::panel);
-    g.fillRoundedRectangle(bounds, static_cast<float> (theme::corner));
 
-    g.setColour(theme::border);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), static_cast<float> (theme::corner), 1.0f);
+    auto display = bounds.reduced(2.0f, 4.0f);
+    g.setColour(theme::shadow.withAlpha(0.22f));
+    g.fillRoundedRectangle(display.translated(0.0f, 2.0f), 8.0f);
 
-    auto stage = bounds.reduced(18.0f, 24.0f);
-    g.setColour(theme::textMuted.withAlpha(0.28f));
+    juce::ColourGradient glass(
+        theme::displayRaised,
+        display.getCentreX(),
+        display.getY(),
+        theme::display,
+        display.getCentreX(),
+        display.getBottom(),
+        false);
+    g.setGradientFill(glass);
+    g.fillRoundedRectangle(display, 8.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.08f));
+    g.fillRoundedRectangle(display.reduced(3.0f).withHeight(display.getHeight() * 0.30f), 5.0f);
+    g.setColour(theme::borderDark.withAlpha(0.55f));
+    g.drawRoundedRectangle(display.reduced(0.5f), 8.0f, 1.0f);
+
+    auto stage = display.reduced(18.0f, 24.0f);
+
+    g.setColour(juce::Colour { 0xff2ff4ff }.withAlpha(0.10f));
+    for (auto x = stage.getX() + 8.0f; x < stage.getRight(); x += 18.0f)
+    {
+        for (auto yDot = stage.getY() + 8.0f; yDot < stage.getBottom(); yDot += 18.0f)
+            g.fillEllipse(x - 0.75f, yDot - 0.75f, 1.5f, 1.5f);
+    }
+
+    g.setColour(theme::textOnDisplay.withAlpha(0.20f));
     g.drawLine(stage.getCentreX(), stage.getY(), stage.getCentreX(), stage.getBottom(), 1.0f);
     g.drawLine(stage.getX(), stage.getCentreY(), stage.getRight(), stage.getCentreY(), 1.0f);
     g.drawLine(stage.getX(), stage.getY(), stage.getRight(), stage.getY(), 1.0f);
     g.drawLine(stage.getX(), stage.getBottom(), stage.getRight(), stage.getBottom(), 1.0f);
 
-    g.setColour(theme::textMuted);
-    g.setFont(13.0f);
-    g.drawText("Stage View", getLocalBounds().removeFromTop(24), juce::Justification::centred);
-
-    g.setFont(11.0f);
+    g.setColour(theme::textOnDisplay.withAlpha(0.72f));
+    g.setFont(juce::FontOptions { 10.0f });
     g.drawText("Back", stage.withHeight(18.0f).toNearestInt(), juce::Justification::centredRight);
     g.drawText("Front", stage.withY(stage.getBottom() - 18.0f).withHeight(18.0f).toNearestInt(), juce::Justification::centredRight);
 
-    const auto dotColour = state.correlation < 0.1f ? theme::warning : theme::accent;
+    const auto dotColour = state.correlation < 0.1f ? theme::warning : theme::textOnDisplay;
     const auto pan = juce::jlimit(-1.0f, 1.0f, state.pan);
     const auto depth = clamp01(state.depth);
     const auto width = clamp01(state.width);
@@ -59,7 +78,7 @@ void StageView::paint(juce::Graphics& g)
 
     const auto leftEdge = juce::jlimit(stage.getX() + 5.0f, stage.getRight() - 5.0f, baseX - spread);
     const auto rightEdge = juce::jlimit(stage.getX() + 5.0f, stage.getRight() - 5.0f, baseX + spread);
-    g.setColour(dotColour.withAlpha(0.18f));
+    g.setColour(dotColour.withAlpha(0.20f));
     g.drawLine(leftEdge, y, rightEdge, y, 4.0f);
     g.fillEllipse(juce::Rectangle<float> { 8.0f, 8.0f }.withCentre({ leftEdge, y }));
     g.fillEllipse(juce::Rectangle<float> { 8.0f, 8.0f }.withCentre({ rightEdge, y }));
@@ -67,15 +86,21 @@ void StageView::paint(juce::Graphics& g)
     if (motion > 0.01f)
     {
         const auto pathWidth = juce::jlimit(18.0f, maxSpread * 2.0f, spread * motion * 2.0f);
-        g.setColour(dotColour.withAlpha(0.22f));
+        g.setColour(theme::accentWarm.withAlpha(0.30f));
         g.drawEllipse(juce::Rectangle<float> { pathWidth, 12.0f }.withCentre({ baseX, y }), 1.5f);
     }
 
     const auto dot = juce::Rectangle<float> { size, size }.withCentre({ x, y });
-    g.setColour(dotColour.withAlpha(0.16f));
+    g.setColour(juce::Colour { 0xff2ff4ff }.withAlpha(0.06f));
+    g.fillEllipse(dot.expanded(34.0f));
+    g.setColour(juce::Colour { 0xff2ff4ff }.withAlpha(0.12f));
+    g.fillEllipse(dot.expanded(22.0f));
+    g.setColour(dotColour.withAlpha(0.18f));
     g.fillEllipse(dot.expanded(10.0f));
-    g.setColour(dotColour);
+    g.setColour(state.correlation < 0.1f ? theme::warning : theme::accent.brighter(0.55f));
     g.fillEllipse(dot);
+    g.setColour(juce::Colours::white.withAlpha(0.45f));
+    g.fillEllipse(dot.reduced(size * 0.28f).translated(-size * 0.10f, -size * 0.12f));
 
     juce::String status;
     auto statusColour = theme::textMuted;
@@ -98,7 +123,7 @@ void StageView::paint(juce::Graphics& g)
     if (status.isNotEmpty())
     {
         g.setColour(statusColour);
-        g.setFont(11.0f);
+        g.setFont(juce::FontOptions { 10.5f });
         g.drawText(status, getLocalBounds().removeFromBottom(24), juce::Justification::centred);
     }
 }

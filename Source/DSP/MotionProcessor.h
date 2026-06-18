@@ -8,6 +8,7 @@ struct MotionConfig
 {
     float amount = 0.0f;
     float rateHz = 0.2f;
+    int preset = 0;
 };
 
 class MotionProcessor

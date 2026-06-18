@@ -1,5 +1,6 @@
 #include "Parameters.h"
 #include "AutoAssistMode.h"
+#include "MotionPreset.h"
 #include "PluginMode.h"
 #include "QualityMode.h"
 #include "SafetyMode.h"
@@ -89,7 +90,7 @@ juce::NormalisableRange<float> skewed(float minValue, float maxValue, float skew
 ParameterLayout createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.reserve(40);
+    params.reserve(41);
 
     params.push_back(makeChoice(ids::role, "Role", makeSelectableRoleNames(), selectableIndexForRole(TrackRole::SunoInstrumental)));
     params.push_back(makeFloat(ids::width, "Width", linear(0.0f, 1.0f), 0.50f));
@@ -133,6 +134,7 @@ ParameterLayout createParameterLayout()
     params.push_back(makeInt(ids::linkMode, "Link Mode", 0, 16, 0));
     params.push_back(makeChoice(ids::pluginMode, "Mode", makePluginModeNames(), 0));
     params.push_back(makeChoice(ids::autoAssistMode, "Auto Assist", makeAutoAssistModeNames(), 2));
+    params.push_back(makeChoice(ids::motionPreset, "Motion Preset", makeMotionPresetNames(), 0));
 
     return { params.begin(), params.end() };
 }

@@ -2,6 +2,7 @@
 
 #include "../DSP/ResonanceTypes.h"
 #include "../Link/RideMemory.h"
+#include "../Link/RideTimelineMemory.h"
 #include <JuceHeader.h>
 
 namespace stagemind
@@ -10,17 +11,19 @@ struct RestoredPluginState
 {
     ResonanceSnapshot learnedResonances;
     RideMemorySnapshot rideMemory;
+    RideTimelineSnapshot rideTimelineMemory;
 };
 
 class PluginState
 {
 public:
-    static constexpr int stateVersion = 3;
+    static constexpr int stateVersion = 5;
 
     static void writeToBlock(
         juce::AudioProcessorValueTreeState& apvts,
         const ResonanceSnapshot& learnedResonances,
         const RideMemorySnapshot& rideMemory,
+        const RideTimelineSnapshot& rideTimelineMemory,
         juce::MemoryBlock& destination);
 
     static RestoredPluginState restoreFromData(

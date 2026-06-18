@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "../Link/LinkSuggestionEngine.h"
 #include "../Model/AutoAssistMode.h"
+#include "../Model/MotionPreset.h"
 #include "../Model/PluginMode.h"
 #include "../Model/SidechainListenMode.h"
 #include "../Model/TriggerMode.h"
@@ -265,6 +266,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+    publishTransportPosition();
 
     auto mainBuffer = getBusBuffer(buffer, false, 0);
 
@@ -399,20 +401,40 @@ void PluginProcessor::beginResonanceLearn() noexcept
 
 void PluginProcessor::beginRideMemoryLearn() noexcept
 {
-    const juce::ScopedLock lock(rideMemoryLock);
-    rideMemory.setLearning(true);
+    {
+        const juce::ScopedLock lock(rideMemoryLock);
+        rideMemory.setLearning(true);
+    }
+
+    {
+        const juce::ScopedLock lock(rideTimelineMemoryLock);
+        rideTimelineMemory.setLearning(true);
+    }
 }
 
 void PluginProcessor::clearRideMemory() noexcept
 {
-    const juce::ScopedLock lock(rideMemoryLock);
-    rideMemory.clear();
+    {
+        const juce::ScopedLock lock(rideMemoryLock);
+        rideMemory.clear();
+    }
+
+    {
+        const juce::ScopedLock lock(rideTimelineMemoryLock);
+        rideTimelineMemory.clear();
+    }
 }
 
 RideMemorySnapshot PluginProcessor::getRideMemorySnapshot() const noexcept
 {
     const juce::ScopedLock lock(rideMemoryLock);
     return rideMemory.snapshot();
+}
+
+RideTimelineSnapshot PluginProcessor::getRideTimelineSnapshot() const noexcept
+{
+    const juce::ScopedLock lock(rideTimelineMemoryLock);
+    return rideTimelineMemory.snapshot();
 }
 
 int PluginProcessor::getNumPrograms()
@@ -446,7 +468,13 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
         rideMemoryState = rideMemory.snapshot();
     }
 
-    PluginState::writeToBlock(apvts, readLearnedResonanceSnapshot(), rideMemoryState, destData);
+    RideTimelineSnapshot rideTimelineMemoryState;
+    {
+        const juce::ScopedLock lock(rideTimelineMemoryLock);
+        rideTimelineMemoryState = rideTimelineMemory.snapshot();
+    }
+
+    PluginState::writeToBlock(apvts, readLearnedResonanceSnapshot(), rideMemoryState, rideTimelineMemoryState, destData);
 }
 
 void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -457,6 +485,10 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     {
         const juce::ScopedLock lock(rideMemoryLock);
         rideMemory.restore(restored.rideMemory);
+    }
+    {
+        const juce::ScopedLock lock(rideTimelineMemoryLock);
+        rideTimelineMemory.restore(restored.rideTimelineMemory);
     }
     resetAutoAssistTracking();
 }
@@ -494,6 +526,46 @@ float PluginProcessor::rawValue(const char* parameterId) const noexcept
         return value->load(std::memory_order_relaxed);
 
     return 0.0f;
+}
+
+void PluginProcessor::publishTransportPosition() noexcept
+{
+    auto valid = false;
+    auto playing = false;
+    auto ppqPosition = 0.0;
+    auto bpm = 120.0;
+
+    if (auto* currentPlayHead = getPlayHead())
+    {
+        if (const auto position = currentPlayHead->getPosition())
+        {
+            if (const auto ppq = position->getPpqPosition())
+            {
+                ppqPosition = *ppq;
+                valid = std::isfinite(ppqPosition) && ppqPosition >= 0.0;
+            }
+
+            if (const auto tempo = position->getBpm())
+                bpm = std::clamp(*tempo, 20.0, 400.0);
+
+            playing = position->getIsPlaying();
+        }
+    }
+
+    transportPositionValid.store(valid ? 1 : 0, std::memory_order_relaxed);
+    transportIsPlaying.store(playing ? 1 : 0, std::memory_order_relaxed);
+    transportPpqPosition.store(valid ? ppqPosition : 0.0, std::memory_order_relaxed);
+    transportBpm.store(bpm, std::memory_order_relaxed);
+}
+
+TransportPositionSnapshot PluginProcessor::getTransportSnapshot() const noexcept
+{
+    TransportPositionSnapshot snapshot;
+    snapshot.valid = transportPositionValid.load(std::memory_order_relaxed) != 0;
+    snapshot.playing = transportIsPlaying.load(std::memory_order_relaxed) != 0;
+    snapshot.ppqPosition = transportPpqPosition.load(std::memory_order_relaxed);
+    snapshot.bpm = transportBpm.load(std::memory_order_relaxed);
+    return snapshot;
 }
 
 void PluginProcessor::timerCallback()
@@ -536,11 +608,84 @@ void PluginProcessor::updateDirectorAutoCommands()
         memoryState = rideMemory.snapshot();
     }
 
+    RideTimelineSnapshot timelineMemoryState;
+    {
+        const juce::ScopedLock lock(rideTimelineMemoryLock);
+        timelineMemoryState = rideTimelineMemory.snapshot();
+    }
+
+    const auto transport = getTransportSnapshot();
     const auto canSendCommand = directorAutoEnabled && directorAutoCommandCooldownTicks <= 0;
     const auto shouldLearnMemory = memoryState.learning || directorAutoEnabled;
+    const auto shouldLearnTimelineMemory = (timelineMemoryState.learning || directorAutoEnabled) && transport.valid;
 
     if (canSendCommand)
     {
+        if (transport.valid && timelineMemoryState.count > 0)
+        {
+            for (const auto& event : timelineMemoryState.events)
+            {
+                if (! event.used || event.group != group || event.actionKind <= 0)
+                    continue;
+
+                if (! event.contains(transport.ppqPosition, rideTimelineMergeWindowPpq))
+                    continue;
+
+                const auto action = LinkSuggestionEngine::actionFor(static_cast<LinkSuggestionKind> (event.actionKind));
+                if (! action.available)
+                    continue;
+
+                for (int current = 0; current < snapshot.count; ++current)
+                {
+                    const auto& currentNode = snapshot.peers[static_cast<size_t> (current)];
+                    if (! rolesMatchForRideMemory(currentNode, event.targetRole)
+                        || autoAssistModeFromIndex(currentNode.autoAssistMode) != AutoAssistMode::Auto)
+                    {
+                        continue;
+                    }
+
+                    if (isSnapshotActionApplied(currentNode, action))
+                    {
+                        {
+                            const juce::ScopedLock lock(rideMemoryLock);
+                            rideMemory.markResolved(event.group, event.targetRole, event.sourceRole, event.actionKind, event.band);
+                        }
+                        {
+                            const juce::ScopedLock lock(rideTimelineMemoryLock);
+                            rideTimelineMemory.markResolved(
+                                event.group,
+                                event.targetRole,
+                                event.sourceRole,
+                                event.actionKind,
+                                event.band,
+                                transport.ppqPosition);
+                        }
+                        continue;
+                    }
+
+                    for (int peer = 0; peer < snapshot.count; ++peer)
+                    {
+                        if (current == peer)
+                            continue;
+
+                        const auto& peerNode = snapshot.peers[static_cast<size_t> (peer)];
+                        if (! rolesMatchForRideMemory(peerNode, event.sourceRole))
+                            continue;
+
+                        LinkCommand command;
+                        command.automatic = true;
+                        command.sourceInstanceId = linkHandle.instanceId;
+                        command.peerInstanceId = peerNode.instanceId;
+                        command.actionKind = event.actionKind;
+
+                        StageMindLinkRegistry::instance().submitCommand(currentNode.instanceId, command);
+                        directorAutoCommandCooldownTicks = directorAutoCommandCooldownDefaultTicks;
+                        return;
+                    }
+                }
+            }
+        }
+
         for (const auto& event : memoryState.events)
         {
             if (! event.used || event.group != group || event.actionKind <= 0)
@@ -561,8 +706,22 @@ void PluginProcessor::updateDirectorAutoCommands()
 
                 if (isSnapshotActionApplied(currentNode, action))
                 {
-                    const juce::ScopedLock lock(rideMemoryLock);
-                    rideMemory.markResolved(event.group, event.targetRole, event.sourceRole, event.actionKind, event.band);
+                    {
+                        const juce::ScopedLock lock(rideMemoryLock);
+                        rideMemory.markResolved(event.group, event.targetRole, event.sourceRole, event.actionKind, event.band);
+                    }
+
+                    if (transport.valid)
+                    {
+                        const juce::ScopedLock lock(rideTimelineMemoryLock);
+                        rideTimelineMemory.markResolved(
+                            event.group,
+                            event.targetRole,
+                            event.sourceRole,
+                            event.actionKind,
+                            event.band,
+                            transport.ppqPosition);
+                    }
                     continue;
                 }
 
@@ -646,6 +805,19 @@ void PluginProcessor::updateDirectorAutoCommands()
                     suggestion.severity,
                     actionAlreadyApplied);
             }
+            if (shouldLearnTimelineMemory)
+            {
+                const juce::ScopedLock lock(rideTimelineMemoryLock);
+                rideTimelineMemory.observe(
+                    group,
+                    currentNode.role,
+                    peerNode.role,
+                    static_cast<int> (suggestion.kind),
+                    band,
+                    transport.ppqPosition,
+                    suggestion.severity,
+                    actionAlreadyApplied);
+            }
             else if (actionAlreadyApplied)
             {
                 const juce::ScopedLock lock(rideMemoryLock);
@@ -655,6 +827,18 @@ void PluginProcessor::updateDirectorAutoCommands()
                     peerNode.role,
                     static_cast<int> (suggestion.kind),
                     band);
+            }
+
+            if (actionAlreadyApplied && transport.valid)
+            {
+                const juce::ScopedLock lock(rideTimelineMemoryLock);
+                rideTimelineMemory.markResolved(
+                    group,
+                    currentNode.role,
+                    peerNode.role,
+                    static_cast<int> (suggestion.kind),
+                    band,
+                    transport.ppqPosition);
             }
 
             if (actionAlreadyApplied || ! canSendCommand)
@@ -1007,6 +1191,7 @@ MotionConfig PluginProcessor::makeMotionConfig(const RoleProfile& profile, Safet
         1.0f,
         rawValue(parameters::ids::motion) * safetyMotionScale(safety) * correlationSafetyScale);
     config.rateHz = rawValue(parameters::ids::motionRate);
+    config.preset = static_cast<int> (rawValue(parameters::ids::motionPreset));
     return config;
 }
 

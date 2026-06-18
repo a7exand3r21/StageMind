@@ -13,7 +13,11 @@ requires prior written permission from the author. See `LICENSE`.
 
 ## MVP Status
 
-Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.8.6 defaults new instances to Link Group 1, Link On, and Auto Assist On.
+Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.9.1 adds Room Depth v1, Motion presets, a visible Double control, and the first hardware-style UI preview.
+
+Design branch: `codex/light-hardware-ui`.
+
+This branch explores a bright hardware processor interface: rounded white chassis, dark glass selector strip, five vertical modules, cyan glow accents, segmented meters, dotted Stage View grid, and custom knob/dropdown/button styling. The DSP and automation behavior are still the same StageMind Node plugin.
 
 Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.5.5 RC note: `docs/STAGEMIND_NODE_0_5_5_RC.md`.
@@ -35,6 +39,11 @@ Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.8.4 RC note: `docs/STAGEMIND_NODE_0_8_4_RC.md`.
 0.8.5 RC note: `docs/STAGEMIND_NODE_0_8_5_RC.md`.
 0.8.6 RC note: `docs/STAGEMIND_NODE_0_8_6_RC.md`.
+0.8.7 RC note: `docs/STAGEMIND_NODE_0_8_7_RC.md`.
+0.8.8 RC note: `docs/STAGEMIND_NODE_0_8_8_RC.md`.
+0.8.9 RC note: `docs/STAGEMIND_NODE_0_8_9_RC.md`.
+0.9.0 RC note: `docs/STAGEMIND_NODE_0_9_0_RC.md`.
+0.9.1 RC note: `docs/STAGEMIND_NODE_0_9_1_RC.md`.
 
 Implemented in this repository:
 
@@ -73,8 +82,9 @@ Implemented in this repository:
   - focused DSP tests with artificial peaks.
 - MVP 4 spatial enhancement path:
   - MotionProcessor with role-limited side motion plus gentle left/right movement for allowed roles;
-  - DepthProcessor as a zero-latency dry path with tiny wet reflections;
-  - PseudoDoubleProcessor for allowed roles;
+  - Motion presets: Slow Drift, Orbit, Pulse, and Wide Sweep;
+  - DepthProcessor as a zero-latency dry path with room-like early reflections, damping, and short feedback;
+  - PseudoDoubleProcessor for allowed roles with a visible `Double` control in the Node UI;
   - correlation safety that reduces risky width/double/motion;
   - basic factory programs exposed through the host;
   - focused DSP tests for dry-path and wet-path behavior.
@@ -125,10 +135,22 @@ Implemented in this repository:
   - Director Auto runs from the Director processor timer, so the Director UI does not need to stay open.
   - new Node/Director instances start in Group 1 with Link enabled and Auto Assist set to Auto;
   - idle Nodes publish a zero-activity Link heartbeat so Director can see installed Nodes before playback starts.
+  - Ride Memory stores compact role-to-role correction events for Director Auto;
+  - Timeline Ride Memory stores coarse PPQ positions for remembered correction events when the host exposes transport position.
+- Hardware UI preview:
+  - white hardware-style chassis;
+  - dark glass top selector strip for Role, Preset, and Motion;
+  - five-module Node layout: Stage View, Space, Character, Sidechain, Metering;
+  - cyan glow buttons for Link, Learn, and SC Enable;
+  - custom rotary knobs with cyan arcs and tick marks;
+  - segmented meters;
+  - dotted Stage View grid with position glow;
+  - custom dark dropdown menu styling.
 
 Not implemented yet:
 
 - automatic master-insert detection for Director mode.
+- full HRTF/binaural positioning and late-room convolution.
 
 ## Build
 
@@ -217,10 +239,11 @@ Current Learn behavior:
 Motion / depth / double:
 
 1. Use `Motion` gently on pads, FX, percussion, and wide background parts.
-2. Use `Depth` to push a part slightly back without adding a full reverb.
-3. `Double` is exposed as the host parameter `pseudo_double_amount`; it is role-limited and off by default.
-4. Mono Safe reduces or disables risky widening behavior.
-5. If correlation drops below the active safety threshold, StageMind gradually reduces width, motion, and double.
+2. Choose a `Motion Preset`: `Slow Drift` is subtle, `Orbit` moves wider, `Pulse` is faster, `Wide Sweep` gives the widest left/right movement.
+3. Use `Depth` to push a part slightly back with early room-like reflections.
+4. Use `Double` when the selected role allows pseudo-doubling. It is role-limited and off by default.
+5. Mono Safe reduces or disables risky widening behavior.
+6. If correlation drops below the active safety threshold, StageMind gradually reduces width, motion, and double.
 
 StageMind Link:
 
@@ -297,6 +320,10 @@ From 0.8.4, Director can also run guarded automatic correction when Director `Au
 From 0.8.5, Director Auto runs from the Director processor timer. The Director UI can be closed after setup; automatic group correction should keep working.
 
 From 0.8.6, a new Director instance also starts in Group 1. New Nodes publish an idle zero-activity heartbeat, so Director can show installed Nodes before playback. Conflicts still require real activity and spectral data.
+
+From 0.8.9, Director Auto stores Ride Memory events. This lets it remember that a target/source role relationship already needed a correction.
+
+From 0.9.0, Director Auto also stores coarse PPQ positions for those events when FL Studio exposes transport position. The Director memory panel shows both relationship events and timeline events. If PPQ is unavailable, normal Ride Memory still works.
 
 Replacing the VST3 while FL Studio is open:
 

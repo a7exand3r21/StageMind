@@ -22,7 +22,7 @@ Use this before distributing any build.
 - [ ] Presets load correctly.
 - [ ] Automation writes and reads correctly.
 - [ ] No parameter ID was renamed accidentally.
-- [ ] StageMind Node 0.8.9 metadata/version is visible in the UI and VST3 module info.
+- [ ] StageMind Node 0.9.1 metadata/version is visible in the UI and VST3 module info.
 
 ## Audio
 
@@ -44,6 +44,7 @@ Use this before distributing any build.
 ## UI
 
 - [ ] All controls show correct values.
+- [ ] Node UI shows `Motion Preset` and `Double` in normal Node mode.
 - [ ] Knobs/sliders respond smoothly.
 - [ ] Hover/active/disabled states work.
 - [ ] Animation does not stutter.
@@ -104,6 +105,9 @@ Use this before distributing any build.
 - [ ] `Clear Memory` removes stored Ride Memory events.
 - [ ] Ride Memory survives FL project save/reopen.
 - [ ] Ride Memory reapplies a remembered correction when matching target/source roles are present again.
+- [ ] Motion Preset changes Stage View movement speed/shape and audible pan/side movement.
+- [ ] Double control changes pseudo-double amount only on roles that allow pseudo-double.
+- [ ] Depth remains zero-latency on the dry path and adds a more audible room-like tail at higher values.
 
 ## Host compatibility
 

@@ -46,6 +46,7 @@ inline constexpr auto linkTargetId = "link_target_id";
 inline constexpr auto linkMode = "link_mode";
 inline constexpr auto pluginMode = "plugin_mode";
 inline constexpr auto autoAssistMode = "auto_assist_mode";
+inline constexpr auto motionPreset = "motion_preset";
 } // namespace ids
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

@@ -2,6 +2,7 @@
 
 #include "../Link/LinkSuggestionEngine.h"
 #include "../UI/DirectorSceneView.h"
+#include "../UI/HardwareLookAndFeel.h"
 #include "../UI/MeterView.h"
 #include "../UI/ResonanceListView.h"
 #include "../UI/StageView.h"
@@ -16,7 +17,7 @@ class PluginEditor final : public juce::AudioProcessorEditor, private juce::Time
 {
 public:
     explicit PluginEditor(PluginProcessor& processorToUse);
-    ~PluginEditor() override = default;
+    ~PluginEditor() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -76,6 +77,7 @@ private:
 
     PluginProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
+    HardwareLookAndFeel hardwareLookAndFeel;
 
     juce::Label titleLabel;
     juce::Label currentRoleLabel;
@@ -85,6 +87,7 @@ private:
     juce::Label roleLabel;
     juce::Label safetyLabel;
     juce::Label triggerLabel;
+    juce::Label motionPresetLabel;
     juce::Label sidechainModeLabel;
     juce::Label sidechainListenLabel;
     juce::Label linkSourceRoleLabel;
@@ -94,6 +97,7 @@ private:
     juce::ComboBox roleCombo;
     juce::ComboBox safetyCombo;
     juce::ComboBox triggerCombo;
+    juce::ComboBox motionPresetCombo;
     juce::ComboBox sidechainModeCombo;
     juce::ComboBox sidechainListenCombo;
     juce::ComboBox linkSourceRoleCombo;
@@ -113,6 +117,7 @@ private:
     juce::Label motionLabel;
     juce::Label cleanUpLabel;
     juce::Label resonanceLabel;
+    juce::Label doubleLabel;
     juce::Label outputLabel;
     juce::Label sidechainAmountLabel;
     juce::Label linkGroupLabel;
@@ -122,6 +127,7 @@ private:
     juce::Slider motionSlider;
     juce::Slider cleanUpSlider;
     juce::Slider resonanceSlider;
+    juce::Slider doubleSlider;
     juce::Slider outputSlider;
     juce::Slider sidechainAmountSlider;
     juce::TextEditor linkGroupEditor;
@@ -167,6 +173,7 @@ private:
     std::unique_ptr<ComboBoxAttachment> roleAttachment;
     std::unique_ptr<ComboBoxAttachment> safetyAttachment;
     std::unique_ptr<ComboBoxAttachment> triggerAttachment;
+    std::unique_ptr<ComboBoxAttachment> motionPresetAttachment;
     std::unique_ptr<ComboBoxAttachment> sidechainModeAttachment;
     std::unique_ptr<ComboBoxAttachment> sidechainListenAttachment;
     std::unique_ptr<ComboBoxAttachment> linkSourceRoleAttachment;
@@ -177,6 +184,7 @@ private:
     std::unique_ptr<SliderAttachment> motionAttachment;
     std::unique_ptr<SliderAttachment> cleanUpAttachment;
     std::unique_ptr<SliderAttachment> resonanceAttachment;
+    std::unique_ptr<SliderAttachment> doubleAttachment;
     std::unique_ptr<SliderAttachment> outputAttachment;
     std::unique_ptr<SliderAttachment> sidechainAmountAttachment;
     bool updatingLinkGroupEditor = false;

@@ -21,6 +21,7 @@ public:
 
 private:
     static constexpr int maxChannels = 2;
+    static constexpr int reflectionTapCount = 4;
 
     float readDelay(int channel, int delaySamples) const noexcept;
     void writeDelay(int channel, float value) noexcept;
@@ -30,9 +31,12 @@ private:
     int delayBufferSize = 1;
     int writePosition = 0;
     int reflectionDelaySamples = 1;
+    int feedbackDelaySamples = 1;
     float dampingCoefficient = 0.0f;
 
     juce::AudioBuffer<float> delayBuffer;
+    std::array<int, reflectionTapCount> reflectionTapSamples {};
+    std::array<float, reflectionTapCount> reflectionTapGains {};
     std::array<float, maxChannels> presenceLowState {};
     std::array<float, maxChannels> wetLowState {};
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> amount { 0.0f };
