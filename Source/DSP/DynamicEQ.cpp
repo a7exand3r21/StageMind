@@ -126,15 +126,15 @@ void DynamicEQ::Band::setTarget(const ResonancePeak& peak, float resonanceAmount
         return;
     }
 
-    const auto intensity = juce::jlimit(0.0f, 1.35f, resonanceAmount);
-    const auto reductionCeilingDb = juce::jlimit(0.0f, 8.0f, maxReductionDb);
-    const auto reductionShape = 0.75f + intensity * 0.45f;
+    const auto intensity = juce::jlimit(0.0f, 1.60f, resonanceAmount);
+    const auto reductionCeilingDb = juce::jlimit(0.0f, 10.0f, maxReductionDb);
+    const auto reductionShape = 0.85f + intensity * 0.55f;
 
     frequencyHz.setTargetValue(juce::jlimit(80.0f, 16000.0f, peak.frequencyHz));
     q.setTargetValue(juce::jlimit(1.0f, 14.0f, peak.suggestedQ * (0.92f + intensity * 0.14f)));
     targetReductionDb = juce::jlimit(
         0.0f,
-        8.0f,
+        10.0f,
         std::min(peak.suggestedReductionDb * reductionShape, reductionCeilingDb) * intensity);
 }
 

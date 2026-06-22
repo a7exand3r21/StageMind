@@ -35,16 +35,17 @@ void CleanUpProcessor::process(juce::AudioBuffer<float>& buffer, const CleanUpCo
     const auto harshStart = coefficientForCutoff(currentSampleRate, config.harshStartHz);
     const auto harshEnd = coefficientForCutoff(currentSampleRate, config.harshEndHz);
     const auto airStart = coefficientForCutoff(currentSampleRate, config.airStartHz);
-    const auto lowMidReduction = juce::jlimit(0.0f, 0.28f, config.lowMidReduction);
-    const auto harshReduction = juce::jlimit(0.0f, 0.24f, config.harshReduction);
-    const auto airLift = juce::jlimit(0.0f, 0.08f, config.airLift);
+    const auto lowMidReduction = juce::jlimit(0.0f, 0.42f, config.lowMidReduction);
+    const auto harshReduction = juce::jlimit(0.0f, 0.38f, config.harshReduction);
+    const auto airLift = juce::jlimit(0.0f, 0.14f, config.airLift);
 
     for (int sample = 0; sample < numSamples; ++sample)
     {
         const auto cleanAmount = amount.getNextValue();
-        const auto lowMidCut = cleanAmount * lowMidReduction;
-        const auto harshCut = cleanAmount * harshReduction;
-        const auto lift = cleanAmount * airLift;
+        const auto shapedCleanAmount = cleanAmount * (0.70f + cleanAmount * 0.30f);
+        const auto lowMidCut = shapedCleanAmount * lowMidReduction;
+        const auto harshCut = shapedCleanAmount * harshReduction;
+        const auto lift = shapedCleanAmount * airLift;
 
         for (int channel = 0; channel < numChannels; ++channel)
         {

@@ -359,6 +359,8 @@ void runLinkSuggestionEngineTests();
 void runLinkSpectralAnalyzerTests();
 void runRideMemoryTests();
 void runRideTimelineMemoryTests();
+void runBalanceTimelineMemoryTests();
+void runRoleBalanceModelTests();
 
 int main()
 {
@@ -378,6 +380,8 @@ int main()
     runLinkSpectralAnalyzerTests();
     runRideMemoryTests();
     runRideTimelineMemoryTests();
+    runBalanceTimelineMemoryTests();
+    runRoleBalanceModelTests();
 
     std::cout << "StageMindDSPTests passed\n";
     return 0;

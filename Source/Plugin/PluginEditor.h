@@ -91,6 +91,8 @@ private:
     juce::Label sidechainModeLabel;
     juce::Label sidechainListenLabel;
     juce::Label linkSourceRoleLabel;
+    juce::Label stageGainModeLabel;
+    juce::Label stageGainMeterModeLabel;
 
     juce::ComboBox modeCombo;
     juce::ComboBox autoAssistCombo;
@@ -101,13 +103,17 @@ private:
     juce::ComboBox sidechainModeCombo;
     juce::ComboBox sidechainListenCombo;
     juce::ComboBox linkSourceRoleCombo;
+    juce::ComboBox stageGainModeCombo;
+    juce::ComboBox stageGainMeterModeCombo;
 
     juce::TextButton sidechainEnableButton { "SC Enable" };
+    juce::TextButton stageGainAnalyzeButton { "Analyze" };
     juce::TextButton resonanceLearnButton { "Learn" };
     juce::TextButton linkEnableButton { "Link" };
     juce::TextButton linkApplyTipButton { "Apply Tip" };
     juce::TextButton directorApplyTipButton { "Apply Tip" };
     juce::TextButton directorLearnMixButton { "Learn Mix" };
+    juce::TextButton directorAnalyzeAllButton { "Analyze All" };
     juce::TextButton directorClearMemoryButton { "Clear Memory" };
     juce::TextButton directorPreviousGroupButton { "<" };
     juce::TextButton directorNextGroupButton { ">" };
@@ -121,6 +127,10 @@ private:
     juce::Label outputLabel;
     juce::Label sidechainAmountLabel;
     juce::Label linkGroupLabel;
+    juce::Label stageGainTargetLabel;
+    juce::Label stageGainThresholdLabel;
+    juce::Label stageGainCeilingLabel;
+    juce::Label stageGainResponseLabel;
 
     juce::Slider widthSlider;
     juce::Slider depthSlider;
@@ -130,6 +140,10 @@ private:
     juce::Slider doubleSlider;
     juce::Slider outputSlider;
     juce::Slider sidechainAmountSlider;
+    juce::Slider stageGainTargetSlider;
+    juce::Slider stageGainThresholdSlider;
+    juce::Slider stageGainCeilingSlider;
+    juce::Slider stageGainResponseSlider;
     juce::TextEditor linkGroupEditor;
 
     StageView stageView;
@@ -146,6 +160,7 @@ private:
     juce::Label linkSuggestionLabel;
     juce::Label linkActionPreviewLabel;
     juce::Label autoAssistStatusLabel;
+    juce::Label stageGainStatusLabel;
     juce::Label directorStatusLabel;
     juce::Label directorGroupsLabel;
     juce::Label directorMemoryLabel;
@@ -177,6 +192,8 @@ private:
     std::unique_ptr<ComboBoxAttachment> sidechainModeAttachment;
     std::unique_ptr<ComboBoxAttachment> sidechainListenAttachment;
     std::unique_ptr<ComboBoxAttachment> linkSourceRoleAttachment;
+    std::unique_ptr<ComboBoxAttachment> stageGainModeAttachment;
+    std::unique_ptr<ComboBoxAttachment> stageGainMeterModeAttachment;
     std::unique_ptr<ButtonAttachment> sidechainEnableAttachment;
     std::unique_ptr<ButtonAttachment> linkEnableAttachment;
     std::unique_ptr<SliderAttachment> widthAttachment;
@@ -187,6 +204,10 @@ private:
     std::unique_ptr<SliderAttachment> doubleAttachment;
     std::unique_ptr<SliderAttachment> outputAttachment;
     std::unique_ptr<SliderAttachment> sidechainAmountAttachment;
+    std::unique_ptr<SliderAttachment> stageGainTargetAttachment;
+    std::unique_ptr<SliderAttachment> stageGainThresholdAttachment;
+    std::unique_ptr<SliderAttachment> stageGainCeilingAttachment;
+    std::unique_ptr<SliderAttachment> stageGainResponseAttachment;
     bool updatingLinkGroupEditor = false;
     float stageMotionPhase = 0.0f;
     LinkSuggestionKind currentLinkSuggestionKind = LinkSuggestionKind::None;

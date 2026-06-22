@@ -65,6 +65,7 @@ void StageMindLinkRegistry::publish(LinkInstanceHandle handle, const LinkPublish
     slot.mode.store(state.mode, std::memory_order_relaxed);
     slot.sidechainMode.store(state.sidechainMode, std::memory_order_relaxed);
     slot.triggerMode.store(state.triggerMode, std::memory_order_relaxed);
+    slot.stageGainMode.store(state.stageGainMode, std::memory_order_relaxed);
     slot.autoAssistMode.store(state.autoAssistMode, std::memory_order_relaxed);
     slot.sidechainEnabled.store(state.sidechainEnabled, std::memory_order_relaxed);
     slot.activity.store(std::clamp(state.activity, 0.0f, 1.0f), std::memory_order_relaxed);
@@ -77,6 +78,8 @@ void StageMindLinkRegistry::publish(LinkInstanceHandle handle, const LinkPublish
     slot.width.store(std::clamp(state.width, 0.0f, 1.0f), std::memory_order_relaxed);
     slot.depth.store(std::clamp(state.depth, 0.0f, 1.0f), std::memory_order_relaxed);
     slot.motion.store(std::clamp(state.motion, 0.0f, 1.0f), std::memory_order_relaxed);
+    slot.outputTrimDb.store(std::clamp(state.outputTrimDb, -24.0f, 12.0f), std::memory_order_relaxed);
+    slot.stageGainDb.store(std::clamp(state.stageGainDb, -36.0f, 24.0f), std::memory_order_relaxed);
     slot.cleanUp.store(std::clamp(state.cleanUp, 0.0f, 1.0f), std::memory_order_relaxed);
     slot.resonance.store(std::clamp(state.resonance, 0.0f, 1.0f), std::memory_order_relaxed);
     const auto bands = clampedBands(state.bands);
@@ -205,9 +208,12 @@ bool StageMindLinkRegistry::submitCommand(std::uint32_t targetInstanceId, LinkCo
         || command.setWidth
         || command.setDepth
         || command.setMotion
+        || command.setOutputTrim
         || command.setCleanUp
         || command.setResonance
-        || command.setSidechainAmount;
+        || command.setSidechainAmount
+        || command.setStageGainMode
+        || command.requestStageGainAnalyze;
     if (targetInstanceId == invalidLinkInstanceId || (command.actionKind == 0 && ! hasDirectParameterCommand))
         return false;
 
@@ -232,16 +238,21 @@ bool StageMindLinkRegistry::submitCommand(std::uint32_t targetInstanceId, LinkCo
         slot.commandSetWidth.store(command.setWidth ? 1 : 0, std::memory_order_relaxed);
         slot.commandSetDepth.store(command.setDepth ? 1 : 0, std::memory_order_relaxed);
         slot.commandSetMotion.store(command.setMotion ? 1 : 0, std::memory_order_relaxed);
+        slot.commandSetOutputTrim.store(command.setOutputTrim ? 1 : 0, std::memory_order_relaxed);
         slot.commandSetCleanUp.store(command.setCleanUp ? 1 : 0, std::memory_order_relaxed);
         slot.commandSetResonance.store(command.setResonance ? 1 : 0, std::memory_order_relaxed);
         slot.commandSetSidechainAmount.store(command.setSidechainAmount ? 1 : 0, std::memory_order_relaxed);
+        slot.commandSetStageGainMode.store(command.setStageGainMode ? 1 : 0, std::memory_order_relaxed);
+        slot.commandRequestStageGainAnalyze.store(command.requestStageGainAnalyze ? 1 : 0, std::memory_order_relaxed);
         slot.commandPan.store(std::clamp(command.pan, -1.0f, 1.0f), std::memory_order_relaxed);
         slot.commandWidth.store(std::clamp(command.width, 0.0f, 1.0f), std::memory_order_relaxed);
         slot.commandDepth.store(std::clamp(command.depth, 0.0f, 1.0f), std::memory_order_relaxed);
         slot.commandMotion.store(std::clamp(command.motion, 0.0f, 1.0f), std::memory_order_relaxed);
+        slot.commandOutputTrimDb.store(std::clamp(command.outputTrimDb, -24.0f, 12.0f), std::memory_order_relaxed);
         slot.commandCleanUp.store(std::clamp(command.cleanUp, 0.0f, 1.0f), std::memory_order_relaxed);
         slot.commandResonance.store(std::clamp(command.resonance, 0.0f, 1.0f), std::memory_order_relaxed);
         slot.commandSidechainAmount.store(std::clamp(command.sidechainAmount, 0.0f, 1.0f), std::memory_order_relaxed);
+        slot.commandStageGainMode.store(std::clamp(command.stageGainMode, 0, 2), std::memory_order_relaxed);
         slot.commandSequence.store(sequence, std::memory_order_release);
         return true;
     }
@@ -273,16 +284,21 @@ LinkCommand StageMindLinkRegistry::consumeCommand(LinkInstanceHandle handle) noe
     command.setWidth = slot.commandSetWidth.load(std::memory_order_relaxed) != 0;
     command.setDepth = slot.commandSetDepth.load(std::memory_order_relaxed) != 0;
     command.setMotion = slot.commandSetMotion.load(std::memory_order_relaxed) != 0;
+    command.setOutputTrim = slot.commandSetOutputTrim.load(std::memory_order_relaxed) != 0;
     command.setCleanUp = slot.commandSetCleanUp.load(std::memory_order_relaxed) != 0;
     command.setResonance = slot.commandSetResonance.load(std::memory_order_relaxed) != 0;
     command.setSidechainAmount = slot.commandSetSidechainAmount.load(std::memory_order_relaxed) != 0;
+    command.setStageGainMode = slot.commandSetStageGainMode.load(std::memory_order_relaxed) != 0;
+    command.requestStageGainAnalyze = slot.commandRequestStageGainAnalyze.load(std::memory_order_relaxed) != 0;
     command.pan = slot.commandPan.load(std::memory_order_relaxed);
     command.width = slot.commandWidth.load(std::memory_order_relaxed);
     command.depth = slot.commandDepth.load(std::memory_order_relaxed);
     command.motion = slot.commandMotion.load(std::memory_order_relaxed);
+    command.outputTrimDb = slot.commandOutputTrimDb.load(std::memory_order_relaxed);
     command.cleanUp = slot.commandCleanUp.load(std::memory_order_relaxed);
     command.resonance = slot.commandResonance.load(std::memory_order_relaxed);
     command.sidechainAmount = slot.commandSidechainAmount.load(std::memory_order_relaxed);
+    command.stageGainMode = slot.commandStageGainMode.load(std::memory_order_relaxed);
     return command;
 }
 
@@ -330,6 +346,7 @@ void StageMindLinkRegistry::clearSlotState(Slot& slot) noexcept
     slot.mode.store(0, std::memory_order_relaxed);
     slot.sidechainMode.store(0, std::memory_order_relaxed);
     slot.triggerMode.store(0, std::memory_order_relaxed);
+    slot.stageGainMode.store(0, std::memory_order_relaxed);
     slot.autoAssistMode.store(0, std::memory_order_relaxed);
     slot.sidechainEnabled.store(false, std::memory_order_relaxed);
     slot.activity.store(0.0f, std::memory_order_relaxed);
@@ -342,6 +359,8 @@ void StageMindLinkRegistry::clearSlotState(Slot& slot) noexcept
     slot.width.store(0.0f, std::memory_order_relaxed);
     slot.depth.store(0.0f, std::memory_order_relaxed);
     slot.motion.store(0.0f, std::memory_order_relaxed);
+    slot.outputTrimDb.store(0.0f, std::memory_order_relaxed);
+    slot.stageGainDb.store(0.0f, std::memory_order_relaxed);
     slot.cleanUp.store(0.0f, std::memory_order_relaxed);
     slot.resonance.store(0.0f, std::memory_order_relaxed);
     slot.bandLow.store(0.0f, std::memory_order_relaxed);
@@ -357,16 +376,21 @@ void StageMindLinkRegistry::clearSlotState(Slot& slot) noexcept
     slot.commandSetWidth.store(0, std::memory_order_relaxed);
     slot.commandSetDepth.store(0, std::memory_order_relaxed);
     slot.commandSetMotion.store(0, std::memory_order_relaxed);
+    slot.commandSetOutputTrim.store(0, std::memory_order_relaxed);
     slot.commandSetCleanUp.store(0, std::memory_order_relaxed);
     slot.commandSetResonance.store(0, std::memory_order_relaxed);
     slot.commandSetSidechainAmount.store(0, std::memory_order_relaxed);
+    slot.commandSetStageGainMode.store(0, std::memory_order_relaxed);
+    slot.commandRequestStageGainAnalyze.store(0, std::memory_order_relaxed);
     slot.commandPan.store(0.0f, std::memory_order_relaxed);
     slot.commandWidth.store(0.0f, std::memory_order_relaxed);
     slot.commandDepth.store(0.0f, std::memory_order_relaxed);
     slot.commandMotion.store(0.0f, std::memory_order_relaxed);
+    slot.commandOutputTrimDb.store(0.0f, std::memory_order_relaxed);
     slot.commandCleanUp.store(0.0f, std::memory_order_relaxed);
     slot.commandResonance.store(0.0f, std::memory_order_relaxed);
     slot.commandSidechainAmount.store(0.0f, std::memory_order_relaxed);
+    slot.commandStageGainMode.store(0, std::memory_order_relaxed);
 }
 
 LinkPeerSnapshot StageMindLinkRegistry::makeSnapshot(const Slot& slot, std::uint32_t instanceId) noexcept
@@ -380,6 +404,7 @@ LinkPeerSnapshot StageMindLinkRegistry::makeSnapshot(const Slot& slot, std::uint
     snapshot.mode = slot.mode.load(std::memory_order_relaxed);
     snapshot.sidechainMode = slot.sidechainMode.load(std::memory_order_relaxed);
     snapshot.triggerMode = slot.triggerMode.load(std::memory_order_relaxed);
+    snapshot.stageGainMode = slot.stageGainMode.load(std::memory_order_relaxed);
     snapshot.autoAssistMode = slot.autoAssistMode.load(std::memory_order_relaxed);
     snapshot.sidechainEnabled = slot.sidechainEnabled.load(std::memory_order_relaxed);
     snapshot.activity = slot.activity.load(std::memory_order_relaxed);
@@ -392,6 +417,8 @@ LinkPeerSnapshot StageMindLinkRegistry::makeSnapshot(const Slot& slot, std::uint
     snapshot.width = slot.width.load(std::memory_order_relaxed);
     snapshot.depth = slot.depth.load(std::memory_order_relaxed);
     snapshot.motion = slot.motion.load(std::memory_order_relaxed);
+    snapshot.outputTrimDb = slot.outputTrimDb.load(std::memory_order_relaxed);
+    snapshot.stageGainDb = slot.stageGainDb.load(std::memory_order_relaxed);
     snapshot.cleanUp = slot.cleanUp.load(std::memory_order_relaxed);
     snapshot.resonance = slot.resonance.load(std::memory_order_relaxed);
     snapshot.bands.low = slot.bandLow.load(std::memory_order_relaxed);

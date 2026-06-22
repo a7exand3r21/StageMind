@@ -117,27 +117,27 @@ SidechainConflictProfile SidechainDynamicEQ::makeProfile(const SidechainDynamicE
     switch (config.mode)
     {
         case SidechainConflictMode::VocalDucksInstrument:
-            profile.bands[0] = { 2000.0f, 5000.0f, 3.0f, true, false };
+            profile.bands[0] = { 1800.0f, 5600.0f, 5.5f, true, false };
             profile.bandCount = 1;
             profile.preserveLowEnd = true;
             break;
 
         case SidechainConflictMode::KickDucksBass:
-            profile.bands[0] = { 45.0f, 100.0f, 4.0f, true, false };
+            profile.bands[0] = { 38.0f, 130.0f, 8.0f, true, false };
             profile.bandCount = 1;
             profile.preserveLowEnd = false;
             break;
 
         case SidechainConflictMode::SnareDucksInstrument:
-            profile.bands[0] = { 1500.0f, 3000.0f, 2.5f, true, false };
+            profile.bands[0] = { 1200.0f, 4200.0f, 5.0f, true, false };
             profile.bandCount = 1;
             profile.preserveLowEnd = true;
             profile.preserveTransient = true;
             break;
 
         case SidechainConflictMode::LeadDucksPad:
-            profile.bands[0] = { 300.0f, 1200.0f, 2.0f, true, false };
-            profile.bands[1] = { 1200.0f, 4000.0f, 4.0f, true, true };
+            profile.bands[0] = { 250.0f, 1200.0f, 3.5f, true, false };
+            profile.bands[1] = { 1200.0f, 5000.0f, 5.5f, true, true };
             profile.bandCount = 2;
             profile.preserveLowEnd = true;
             break;
@@ -145,7 +145,7 @@ SidechainConflictProfile SidechainDynamicEQ::makeProfile(const SidechainDynamicE
         case SidechainConflictMode::Custom:
             profile.bands[0] = { sortedStart(config.customRangeStartHz, config.customRangeEndHz),
                                  sortedEnd(config.customRangeStartHz, config.customRangeEndHz),
-                                 4.0f,
+                                 6.0f,
                                  true,
                                  false };
             profile.bandCount = 1;
@@ -153,8 +153,9 @@ SidechainConflictProfile SidechainDynamicEQ::makeProfile(const SidechainDynamicE
             break;
 
         case SidechainConflictMode::MakeSpace:
-            profile.bands[0] = { 300.0f, 4000.0f, 2.0f, true, false };
-            profile.bandCount = 1;
+            profile.bands[0] = { 220.0f, 1000.0f, 3.2f, true, false };
+            profile.bands[1] = { 900.0f, 5200.0f, 5.0f, true, true };
+            profile.bandCount = 2;
             profile.preserveLowEnd = true;
             break;
 
@@ -254,10 +255,11 @@ float SidechainDynamicEQ::targetReductionDb(
     if (! config.enabled || ! sidechain.isActive)
         return 0.0f;
 
-    const auto normalizedEnvelope = juce::jlimit(0.0f, 1.0f, sidechain.envelope * 4.0f);
+    const auto normalizedEnvelope = juce::jlimit(0.0f, 1.0f, sidechain.envelope * 6.5f);
     const auto amount = juce::jlimit(0.0f, 1.0f, config.amount);
-    const auto maxReduction = juce::jlimit(0.0f, 7.0f, band.maxReductionDb);
+    const auto shapedAmount = amount * (0.70f + amount * 0.30f);
+    const auto maxReduction = juce::jlimit(0.0f, 10.0f, band.maxReductionDb);
 
-    return maxReduction * amount * normalizedEnvelope;
+    return maxReduction * shapedAmount * normalizedEnvelope;
 }
 } // namespace stagemind

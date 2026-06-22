@@ -1,4 +1,4 @@
-# StageMind Node 0.8.9 - короткая инструкция для теста
+﻿# StageMind Node 0.11.3 - короткая инструкция для теста
 
 StageMind Node - VST3 insert-effect для FL Studio. Ставится на mixer insert дорожки: вокал, барабаны, бас, гитара, синты, подкладки и другие stems.
 
@@ -10,62 +10,79 @@ StageMind Node - VST3 insert-effect для FL Studio. Ставится на mixe
 4. `Options > Manage plugins > Find plugins`.
 5. Добавь `StageMind Node` на mixer insert.
 
-Если Windows не даёт заменить файл VST3, закрой FL Studio. Отключение слота в FL не обязано выгружать DLL из процесса host.
+Если Windows не даёт заменить файл VST3, закрой FL Studio. Отключение слота внутри FL не всегда выгружает DLL из процесса host.
 
-## Что уже работает
+## Что работает
 
-- Роли дорожек: Suno Vocal, Suno Drums, Suno Bass, Suno Guitar и другие.
-- Width, Depth, Motion, Clean Up, Resonance, Output.
+- Роли дорожек: vocal, drums, bass, guitar, synth, pad, FX и другие.
+- Width, Depth, Motion, Clean Up, Resonance, Doubler, Output Trim.
+- Stage Gain: `Off`, `Static`, `Ride`.
+- Stage Gain meter modes: `dBFS`, `VU`, `RMS`, `LUFS M`, `LUFS S`, `LUFS I`.
+- Stage Gain `Ride`: плавно подтягивает уровень к target.
+- Stage Gain `Static`: кнопка `Analyze` запоминает фиксированную коррекцию.
+- Director `Analyze All`: отправляет Static Analyze всем нодам выбранной группы.
+- Look-ahead ceiling limiter после Stage Gain.
+- Диагностический CSV-лог с решениями автоматики и снапшотами нод.
+- Защита от частого переключения ducking-режимов одной ноды.
+- Director Balance трогает Output Trim только у нод в `Stage Gain: Ride`.
+- Director Balance ограничен диапазоном `-3 dB` / `+3 dB`.
+- Если выключить `SC Enable` на уже настроенном ducking, Auto не включает его обратно.
 - Локальный поиск и подавление резонансов.
 - Sidechain Dynamic EQ.
 - StageMind Link между несколькими инстансами.
 - Director mode внутри того же плагина.
-- Auto Assist.
-- Director Auto correction.
-- Ride Memory: Director запоминает найденные конфликты группы, показывает сколько событий найдено, сколько resolved, и может применить известную коррекцию снова.
-- Управление нодами из Director: выбрать ноду, увидеть её значения, двигать Pan/Depth и крутить основные ручки выбранной ноды.
+- Auto Assist, Director Auto correction, Ride Memory, Balance Timeline Memory.
+- Save/reopen сохраняет параметры, память и Static Stage Gain hold.
 
-## Быстрый тест Link/Director
+## Быстрый тест Stage Gain
+
+1. Поставь StageMind Node на дорожку с неровной громкостью.
+2. Выбери `Stage Gain: Ride`.
+3. Поставь `Target` около `-18 dB`, `Threshold` около `-12 VU`, `Ceiling` около `-1 dB`.
+4. Запусти playback и смотри строку статуса: должно появляться `Ride +... dB` или `Ride -... dB`.
+5. Переключи meter mode: `dBFS`, `VU`, `RMS`, `LUFS M/S/I`. Реакция будет немного отличаться.
+6. Переключи `Stage Gain` в `Static`.
+7. Во время звучащего участка нажми `Analyze`.
+8. Статус должен перейти в `Hold ... dB`.
+9. Сохрани проект, открой заново и проверь, что hold остался.
+
+## Быстрый тест Analyze All
 
 1. Поставь StageMind Node на несколько дорожек.
-2. Ничего не включай вручную: новые инстансы уже стартуют с `Link On`, `Group 1`, `Auto`.
-3. Поставь ещё один StageMind Node и переключи `Mode` в `Director`.
-4. Director тоже должен быть на `Group 1`.
-5. До playback Director должен видеть установленные Nodes.
-6. Во время playback должны появляться activity/conflicts, а после auto-коррекции строки могут стать `resolved`.
-7. В Director справа должна появиться строка `Memory auto` или `Memory learning`.
-8. Если конфликт найден, счётчик events должен расти. После применения часть событий может стать `resolved`.
+2. У всех должна быть `Group = 1` и `Link` включён.
+3. Поставь ещё один StageMind Node и выбери `Mode: Director`.
+4. В Director нажми `Analyze All` во время playback.
+5. Ноды группы должны перейти в Static Stage Gain и поймать свой `Hold`.
 
-## Быстрый тест управления из Director
+## Быстрый тест limiter
 
-1. В Director нажми на точку ноды или на линию Width вокруг неё.
-2. В средней панели должен появиться выбранный Node.
-3. Потяни точку влево/вправо: звук целевой дорожки должен менять панораму.
-4. Потяни точку вверх/вниз: у целевой ноды должен меняться Depth.
-5. Покрути в средней панели Pan, Width, Depth, Motion, Clean Up, Resonance, SC Amount.
-6. Меняться должна выбранная нода, не Director.
-7. Сохрани и открой проект заново: значения должны восстановиться.
+1. На одной ноде выбери `Stage Gain: Ride`.
+2. Поставь `Ceiling`, например, `-6 dB`.
+3. Подай громкий материал.
+4. Output peak не должен уходить сильно выше ceiling.
+5. Плагин теперь имеет небольшую фиксированную latency для look-ahead. Это нормально.
 
-## Что проверить
+## Что проверить дополнительно
 
-- Новый Node сразу имеет `Link` включён, `Group = 1`, `Auto = Auto`.
+- Новый Node стартует с `Link On`, `Group = 1`, `Auto = Auto`.
 - Director видит idle Nodes до playback.
-- Director показывает Ride Memory status: `Memory auto`, количество events и resolved.
-- `Learn Mix` включает ручное обучение памяти.
-- `Clear Memory` сбрасывает найденные события.
-- Save/reopen сохраняет Ride Memory events в проекте.
-- При playback live activity не пропадает.
-- Bass/Drums conflict может включить StageMind Link sidechain без ручного FL routing.
-- Save/reopen сохраняет значения.
+- В playback появляются activity/conflicts.
 - Render/export не ломается.
+- Resize окна сохраняется после закрытия/открытия UI.
 - Director click/drag управляет Pan/Depth целевой ноды.
-- Средняя панель Director управляет выбранной нодой.
-- Конфликты/статусы не должны мигать слишком быстро; resolved-строки должны оставаться читаемыми.
+
+## Диагностический лог
+
+Во время работы плагин пишет CSV сюда:
+
+`C:\Users\<user>\Documents\StageMind\Logs\StageMind-session-YYYYMMDD-HHMMSS.csv`
+
+После теста пришли последний файл из этой папки и коротко напиши, что звучало неправильно: например "гитара не получила авто-коррекцию", "бас стал слишком тихим", "Director видел конфликт, но не применил". В логе будут видны роли, группы, режимы Stage Gain, auto decisions, Link-команды, уровни, correlation, transport PPQ/BPM и события Analyze/Analyze All. У Director snapshot теперь должны быть заполнены `link_nodes` и `active_peers`.
 
 ## Ограничения
 
+- LUFS modes - практичные Stage Gain meters, не сертифицированный broadcast QC.
+- `Analyze All` анализирует текущий момент playback, а не весь трек offline.
+- Ceiling limiter - safety ceiling, не полноценный mastering limiter с oversampling/ISP.
 - Плагин не передаёт audio между инстансами, только control data.
-- Полной памяти по таймлайну песни пока нет. Ride Memory запоминает отношения ролей в группе, но пока не знает точные такты/части песни.
-- Director не определяется автоматически по master insert. Нужно выбрать `Mode: Director`.
-- Если FL реально освобождает ресурсы инстанса, Node исчезает из Director/Link до повторного запуска.
-- Плагин не может сам выгрузить VST3 DLL из FL Studio. Для замены файла обычно нужно закрыть FL.
+- Director не выбирается автоматически по master insert. Нужно выбрать `Mode: Director`.

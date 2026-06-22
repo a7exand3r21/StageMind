@@ -4,6 +4,7 @@
 #include "../DSP/CorrelationMeter.h"
 #include "../DSP/DepthProcessor.h"
 #include "../DSP/DynamicEQ.h"
+#include "../DSP/LevelRider.h"
 #include "../DSP/LinkSpectralAnalyzer.h"
 #include "../DSP/MeterSnapshot.h"
 #include "../DSP/MotionProcessor.h"
@@ -13,11 +14,13 @@
 #include "../DSP/SidechainDetector.h"
 #include "../DSP/SidechainDynamicEQ.h"
 #include "../DSP/SpatialProcessor.h"
+#include "../DSP/StageGainLoudnessMeter.h"
 #include "../Link/LinkActivityEnvelope.h"
 #include "../Link/StageMindLinkRegistry.h"
 #include "../Model/Parameters.h"
 #include "../Model/PluginState.h"
 #include "../Model/RolePresetEngine.h"
+#include "../Model/StageGainMode.h"
 #include <JuceHeader.h>
 
 namespace stagemind
@@ -65,11 +68,16 @@ public:
     juce::AudioProcessorValueTreeState& getValueTreeState() noexcept { return apvts; }
     const MeterSnapshot& getMeters() const noexcept { return meters; }
     std::uint32_t getLinkInstanceId() const noexcept { return linkHandle.instanceId; }
+    std::pair<int, int> getSavedEditorSize() const;
+    void setSavedEditorSize(int width, int height);
     void beginResonanceLearn() noexcept;
+    void beginStageGainAnalyze() noexcept;
+    int requestStageGainAnalyzeForCurrentGroup();
     void beginRideMemoryLearn() noexcept;
     void clearRideMemory() noexcept;
     RideMemorySnapshot getRideMemorySnapshot() const noexcept;
     RideTimelineSnapshot getRideTimelineSnapshot() const noexcept;
+    BalanceTimelineSnapshot getBalanceTimelineSnapshot() const noexcept;
     TransportPositionSnapshot getTransportSnapshot() const noexcept;
 
 private:
@@ -79,6 +87,8 @@ private:
     void timerCallback() override;
     float rawValue(const char* parameterId) const noexcept;
     void publishTransportPosition() noexcept;
+    void writeDiagnosticEvent(const juce::String& eventName, const juce::String& note = {});
+    void writeDiagnosticSnapshot();
     void updateDirectorAutoCommands();
     void applyLinkCommand(LinkCommand command);
     void applyPendingAutoAssist();
@@ -88,6 +98,7 @@ private:
     UserMacroParams makeMacroParams() const noexcept;
     void updateOutputGainTarget() noexcept;
     void applyOutputGain(juce::AudioBuffer<float>& buffer) noexcept;
+    LevelRiderConfig makeLevelRiderConfig() noexcept;
     void renderSidechainListen(const juce::AudioBuffer<float>& sidechainBuffer, juce::AudioBuffer<float>& mainBuffer) noexcept;
     SidechainAnalysis makeEffectiveSidechainAnalysis(const SidechainAnalysis& externalSidechain) const noexcept;
     SidechainDynamicEQConfig makeSidechainEQConfig() const noexcept;
@@ -148,6 +159,8 @@ private:
     ResonanceDetector resonanceDetector;
     ResonanceLearner resonanceLearner;
     DynamicEQ dynamicEQ;
+    LevelRider levelRider;
+    StageGainLoudnessMeter stageGainLoudnessMeter;
     SidechainDetector sidechainDetector;
     SidechainDynamicEQ sidechainDynamicEQ;
     MeterSnapshot meters;
@@ -157,6 +170,8 @@ private:
     RideMemory rideMemory;
     mutable juce::CriticalSection rideTimelineMemoryLock;
     RideTimelineMemory rideTimelineMemory;
+    mutable juce::CriticalSection balanceTimelineMemoryLock;
+    BalanceTimelineMemory balanceTimelineMemory;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outputGain { 1.0f };
     std::atomic<int> transportPositionValid { 0 };
@@ -164,6 +179,7 @@ private:
     std::atomic<double> transportPpqPosition { 0.0 };
     std::atomic<double> transportBpm { 120.0 };
     std::atomic<bool> resonanceLearnRequested { false };
+    std::atomic<bool> stageGainAnalyzeRequested { false };
     std::atomic<bool> autoResonanceTuningPending { false };
     std::atomic<int> autoPendingLinkActionKind { 0 };
     std::atomic<int> autoPendingLinkSourceId { 0 };
@@ -177,6 +193,7 @@ private:
     int autoLinkCandidateSourceId = 0;
     int autoLinkCandidateSamples = 0;
     int directorAutoCommandCooldownTicks = 0;
+    int diagnosticSnapshotTicks = 0;
     int autoTrackedGroup = 0;
     int autoTrackedRole = 0;
     bool autoResonanceStarted = false;

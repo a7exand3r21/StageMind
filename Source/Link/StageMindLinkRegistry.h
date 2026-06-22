@@ -32,6 +32,7 @@ struct LinkPublishState
     int mode = 0;
     int sidechainMode = 0;
     int triggerMode = 0;
+    int stageGainMode = 0;
     int autoAssistMode = 0;
     bool sidechainEnabled = false;
     float activity = 0.0f;
@@ -44,6 +45,8 @@ struct LinkPublishState
     float width = 0.0f;
     float depth = 0.0f;
     float motion = 0.0f;
+    float outputTrimDb = 0.0f;
+    float stageGainDb = 0.0f;
     float cleanUp = 0.0f;
     float resonance = 0.0f;
     LinkSpectralBands bands;
@@ -66,6 +69,7 @@ struct LinkPeerSnapshot
     int mode = 0;
     int sidechainMode = 0;
     int triggerMode = 0;
+    int stageGainMode = 0;
     int autoAssistMode = 0;
     bool sidechainEnabled = false;
     float activity = 0.0f;
@@ -78,6 +82,8 @@ struct LinkPeerSnapshot
     float width = 0.0f;
     float depth = 0.0f;
     float motion = 0.0f;
+    float outputTrimDb = 0.0f;
+    float stageGainDb = 0.0f;
     float cleanUp = 0.0f;
     float resonance = 0.0f;
     LinkSpectralBands bands;
@@ -101,16 +107,21 @@ struct LinkCommand
     bool setWidth = false;
     bool setDepth = false;
     bool setMotion = false;
+    bool setOutputTrim = false;
     bool setCleanUp = false;
     bool setResonance = false;
     bool setSidechainAmount = false;
+    bool setStageGainMode = false;
+    bool requestStageGainAnalyze = false;
     float pan = 0.0f;
     float width = 0.0f;
     float depth = 0.0f;
     float motion = 0.0f;
+    float outputTrimDb = 0.0f;
     float cleanUp = 0.0f;
     float resonance = 0.0f;
     float sidechainAmount = 0.0f;
+    int stageGainMode = 0;
 };
 
 class StageMindLinkRegistry final
@@ -140,6 +151,7 @@ private:
         std::atomic<int> mode { 0 };
         std::atomic<int> sidechainMode { 0 };
         std::atomic<int> triggerMode { 0 };
+        std::atomic<int> stageGainMode { 0 };
         std::atomic<int> autoAssistMode { 0 };
         std::atomic<bool> sidechainEnabled { false };
         std::atomic<float> activity { 0.0f };
@@ -152,6 +164,8 @@ private:
         std::atomic<float> width { 0.0f };
         std::atomic<float> depth { 0.0f };
         std::atomic<float> motion { 0.0f };
+        std::atomic<float> outputTrimDb { 0.0f };
+        std::atomic<float> stageGainDb { 0.0f };
         std::atomic<float> cleanUp { 0.0f };
         std::atomic<float> resonance { 0.0f };
         std::atomic<float> bandLow { 0.0f };
@@ -167,16 +181,21 @@ private:
         std::atomic<int> commandSetWidth { 0 };
         std::atomic<int> commandSetDepth { 0 };
         std::atomic<int> commandSetMotion { 0 };
+        std::atomic<int> commandSetOutputTrim { 0 };
         std::atomic<int> commandSetCleanUp { 0 };
         std::atomic<int> commandSetResonance { 0 };
         std::atomic<int> commandSetSidechainAmount { 0 };
+        std::atomic<int> commandSetStageGainMode { 0 };
+        std::atomic<int> commandRequestStageGainAnalyze { 0 };
         std::atomic<float> commandPan { 0.0f };
         std::atomic<float> commandWidth { 0.0f };
         std::atomic<float> commandDepth { 0.0f };
         std::atomic<float> commandMotion { 0.0f };
+        std::atomic<float> commandOutputTrimDb { 0.0f };
         std::atomic<float> commandCleanUp { 0.0f };
         std::atomic<float> commandResonance { 0.0f };
         std::atomic<float> commandSidechainAmount { 0.0f };
+        std::atomic<int> commandStageGainMode { 0 };
     };
 
     static void clearSlotState(Slot& slot) noexcept;

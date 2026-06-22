@@ -6,6 +6,8 @@
 #include "SafetyMode.h"
 #include "SidechainConflictMode.h"
 #include "SidechainListenMode.h"
+#include "StageGainMeterMode.h"
+#include "StageGainMode.h"
 #include "TrackRole.h"
 #include "TriggerMode.h"
 
@@ -90,7 +92,7 @@ juce::NormalisableRange<float> skewed(float minValue, float maxValue, float skew
 ParameterLayout createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.reserve(41);
+    params.reserve(47);
 
     params.push_back(makeChoice(ids::role, "Role", makeSelectableRoleNames(), selectableIndexForRole(TrackRole::SunoInstrumental)));
     params.push_back(makeFloat(ids::width, "Width", linear(0.0f, 1.0f), 0.50f));
@@ -99,11 +101,11 @@ ParameterLayout createParameterLayout()
     params.push_back(makeFloat(ids::cleanUp, "Clean Up", linear(0.0f, 1.0f), 0.30f));
     params.push_back(makeFloat(ids::resonance, "Resonance", linear(0.0f, 1.0f), 0.30f));
     params.push_back(makeChoice(ids::safety, "Safety", makeSafetyModeNames(), 1));
-    params.push_back(makeFloat(ids::outputGain, "Output", linear(-24.0f, 12.0f), 0.0f, "dB"));
+    params.push_back(makeFloat(ids::outputGain, "Output Trim", linear(-24.0f, 12.0f), 0.0f, "dB"));
 
     params.push_back(makeChoice(ids::triggerMode, "Trigger", makeTriggerModeNames(), 0));
     params.push_back(makeBool(ids::sidechainEnabled, "SC Enable", false));
-    params.push_back(makeChoice(ids::sidechainMode, "SC Mode", makeSidechainConflictModeNames(), 0));
+    params.push_back(makeChoice(ids::sidechainMode, "Ducking", makeSidechainConflictModeNames(), 0));
     params.push_back(makeChoice(ids::sidechainSourceRole, "SC Source", makeSelectableRoleNames(), selectableIndexForRole(TrackRole::LeadVocal)));
     params.push_back(makeFloat(ids::sidechainAmount, "SC Amount", linear(0.0f, 1.0f), 0.30f));
     params.push_back(makeChoice(ids::sidechainListen, "SC Listen", makeSidechainListenModeNames(), 0));
@@ -121,7 +123,7 @@ ParameterLayout createParameterLayout()
     params.push_back(makeFloat(ids::dynamicEqAttack, "Dyn Attack", skewed(1.0f, 200.0f, 30.0f), 30.0f, "ms"));
     params.push_back(makeFloat(ids::dynamicEqRelease, "Dyn Release", skewed(20.0f, 1000.0f, 250.0f), 250.0f, "ms"));
     params.push_back(makeFloat(ids::motionRate, "Motion Rate", skewed(0.01f, 8.0f, 0.20f), 0.20f, "Hz"));
-    params.push_back(makeFloat(ids::pseudoDoubleAmount, "Double", linear(0.0f, 1.0f), 0.0f));
+    params.push_back(makeFloat(ids::pseudoDoubleAmount, "Doubler", linear(0.0f, 1.0f), 0.0f));
     params.push_back(makeFloat(ids::presenceReduction, "Presence", linear(0.0f, 1.0f), 0.0f));
     params.push_back(makeFloat(ids::earlyReflectionAmount, "Early Ref", linear(0.0f, 1.0f), 0.0f));
     params.push_back(makeChoice(ids::analyzerQuality, "Analyzer", makeQualityNames(), 1));
@@ -135,6 +137,12 @@ ParameterLayout createParameterLayout()
     params.push_back(makeChoice(ids::pluginMode, "Mode", makePluginModeNames(), 0));
     params.push_back(makeChoice(ids::autoAssistMode, "Auto Assist", makeAutoAssistModeNames(), 2));
     params.push_back(makeChoice(ids::motionPreset, "Motion Preset", makeMotionPresetNames(), 0));
+    params.push_back(makeChoice(ids::stageGainMode, "Stage Gain", makeStageGainModeNames(), 0));
+    params.push_back(makeChoice(ids::stageGainMeterMode, "Stage Meter", makeStageGainMeterModeNames(), 0));
+    params.push_back(makeFloat(ids::stageGainTargetDb, "Stage Target", linear(-30.0f, -6.0f), -18.0f, "dB"));
+    params.push_back(makeFloat(ids::stageGainThresholdVu, "Stage Threshold", linear(-36.0f, 0.0f), -12.0f, "VU"));
+    params.push_back(makeFloat(ids::stageGainCeilingDb, "Stage Ceiling", linear(-12.0f, 0.0f), -1.0f, "dB"));
+    params.push_back(makeFloat(ids::stageGainResponse, "Stage Response", linear(0.0f, 1.0f), 0.65f));
 
     return { params.begin(), params.end() };
 }

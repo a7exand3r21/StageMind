@@ -328,16 +328,21 @@ void registrySubmitsAndConsumesDirectorSpatialCommand()
     command.setWidth = true;
     command.setDepth = true;
     command.setMotion = true;
+    command.setOutputTrim = true;
     command.setCleanUp = true;
     command.setResonance = true;
     command.setSidechainAmount = true;
+    command.setStageGainMode = true;
+    command.requestStageGainAnalyze = true;
     command.pan = 2.0f;
     command.width = 1.5f;
     command.depth = -1.0f;
     command.motion = 0.25f;
+    command.outputTrimDb = 14.0f;
     command.cleanUp = 0.35f;
     command.resonance = 0.45f;
     command.sidechainAmount = 0.55f;
+    command.stageGainMode = 5;
 
     expect(registry.submitCommand(target.instanceId, command), "director spatial command should submit without a suggestion action");
 
@@ -349,16 +354,21 @@ void registrySubmitsAndConsumesDirectorSpatialCommand()
     expect(consumed.setWidth, "spatial command should request width write");
     expect(consumed.setDepth, "spatial command should request depth write");
     expect(consumed.setMotion, "spatial command should request motion write");
+    expect(consumed.setOutputTrim, "spatial command should request output trim write");
     expect(consumed.setCleanUp, "spatial command should request clean up write");
     expect(consumed.setResonance, "spatial command should request resonance write");
     expect(consumed.setSidechainAmount, "spatial command should request sidechain amount write");
+    expect(consumed.setStageGainMode, "spatial command should request stage gain mode write");
+    expect(consumed.requestStageGainAnalyze, "spatial command should request stage gain analyze");
     expect(std::abs(consumed.pan - 1.0f) < 1.0e-6f, "spatial command pan should be clamped");
     expect(std::abs(consumed.width - 1.0f) < 1.0e-6f, "spatial command width should be clamped");
     expect(std::abs(consumed.depth - 0.0f) < 1.0e-6f, "spatial command depth should be clamped");
     expect(std::abs(consumed.motion - 0.25f) < 1.0e-6f, "spatial command motion should be preserved");
+    expect(std::abs(consumed.outputTrimDb - 12.0f) < 1.0e-6f, "spatial command output trim should be clamped");
     expect(std::abs(consumed.cleanUp - 0.35f) < 1.0e-6f, "spatial command clean up should be preserved");
     expect(std::abs(consumed.resonance - 0.45f) < 1.0e-6f, "spatial command resonance should be preserved");
     expect(std::abs(consumed.sidechainAmount - 0.55f) < 1.0e-6f, "spatial command SC amount should be preserved");
+    expect(consumed.stageGainMode == 2, "spatial command stage gain mode should be clamped");
     expect(! registry.consumeCommand(target).found, "spatial command should be consumed only once");
 
     registry.unregisterInstance(director);

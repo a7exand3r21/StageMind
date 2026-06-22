@@ -32,6 +32,24 @@ constexpr auto rideTimelineLastSeenPrefix = "ride_timeline_last_seen_ppq_";
 constexpr auto rideTimelineSeverityPrefix = "ride_timeline_severity_";
 constexpr auto rideTimelineHitsPrefix = "ride_timeline_hits_";
 constexpr auto rideTimelineResolvedPrefix = "ride_timeline_resolved_";
+constexpr auto balanceTimelineLearningProperty = "balance_timeline_learning";
+constexpr auto balanceTimelineCountProperty = "balance_timeline_count";
+constexpr auto balanceTimelineGroupPrefix = "balance_timeline_group_";
+constexpr auto balanceTimelineTargetRolePrefix = "balance_timeline_target_role_";
+constexpr auto balanceTimelineSectionIndexPrefix = "balance_timeline_section_index_";
+constexpr auto balanceTimelineSectionKindPrefix = "balance_timeline_section_kind_";
+constexpr auto balanceTimelineSectionStartPrefix = "balance_timeline_section_start_ppq_";
+constexpr auto balanceTimelineSectionEndPrefix = "balance_timeline_section_end_ppq_";
+constexpr auto balanceTimelineStartPrefix = "balance_timeline_start_ppq_";
+constexpr auto balanceTimelineEndPrefix = "balance_timeline_end_ppq_";
+constexpr auto balanceTimelineLastSeenPrefix = "balance_timeline_last_seen_ppq_";
+constexpr auto balanceTimelineCorrectionPrefix = "balance_timeline_correction_db_";
+constexpr auto balanceTimelineSeverityPrefix = "balance_timeline_severity_";
+constexpr auto balanceTimelineHitsPrefix = "balance_timeline_hits_";
+constexpr auto balanceTimelineResolvedPrefix = "balance_timeline_resolved_";
+constexpr auto levelRiderTargetRmsProperty = "level_rider_target_rms";
+constexpr auto levelRiderHeldGainDbProperty = "level_rider_held_gain_db";
+constexpr auto levelRiderHasHeldGainProperty = "level_rider_has_held_gain";
 
 juce::Identifier indexedProperty(const char* prefix, int index)
 {
@@ -218,6 +236,93 @@ RideTimelineSnapshot readRideTimelineMemory(const juce::ValueTree& state)
 
     return snapshot;
 }
+
+void writeBalanceTimelineMemory(juce::ValueTree& state, const BalanceTimelineSnapshot& snapshot)
+{
+    state.setProperty(balanceTimelineLearningProperty, snapshot.learning, nullptr);
+
+    auto storedCount = 0;
+    for (const auto& event : snapshot.events)
+    {
+        if (! event.used || storedCount >= maxBalanceTimelineEvents)
+            continue;
+
+        state.setProperty(indexedProperty(balanceTimelineGroupPrefix, storedCount), event.group, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineTargetRolePrefix, storedCount), event.targetRole, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionIndexPrefix, storedCount), event.sectionIndex, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionKindPrefix, storedCount), event.sectionKind, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionStartPrefix, storedCount), event.sectionStartPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionEndPrefix, storedCount), event.sectionEndPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineStartPrefix, storedCount), event.startPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineEndPrefix, storedCount), event.endPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineLastSeenPrefix, storedCount), event.lastSeenPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineCorrectionPrefix, storedCount), event.correctionDb, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSeverityPrefix, storedCount), event.severity, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineHitsPrefix, storedCount), event.hits, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineResolvedPrefix, storedCount), event.resolved, nullptr);
+        ++storedCount;
+    }
+
+    state.setProperty(balanceTimelineCountProperty, storedCount, nullptr);
+
+    for (int index = storedCount; index < maxBalanceTimelineEvents; ++index)
+    {
+        state.setProperty(indexedProperty(balanceTimelineGroupPrefix, index), 0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineTargetRolePrefix, index), 0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionIndexPrefix, index), 0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionKindPrefix, index), static_cast<int> (BalanceTimelineSectionKind::Intro), nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionStartPrefix, index), 0.0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSectionEndPrefix, index), balanceTimelineSectionLengthPpq, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineStartPrefix, index), 0.0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineEndPrefix, index), 0.0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineLastSeenPrefix, index), 0.0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineCorrectionPrefix, index), 0.0f, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineSeverityPrefix, index), 0.0f, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineHitsPrefix, index), 0, nullptr);
+        state.setProperty(indexedProperty(balanceTimelineResolvedPrefix, index), false, nullptr);
+    }
+}
+
+BalanceTimelineSnapshot readBalanceTimelineMemory(const juce::ValueTree& state)
+{
+    BalanceTimelineSnapshot snapshot;
+    snapshot.learning = static_cast<bool> (state.getProperty(balanceTimelineLearningProperty, false));
+    const auto count = juce::jlimit(
+        0,
+        maxBalanceTimelineEvents,
+        static_cast<int> (state.getProperty(balanceTimelineCountProperty, 0)));
+
+    for (int index = 0; index < count; ++index)
+    {
+        BalanceTimelineEvent event;
+        event.used = true;
+        event.group = static_cast<int> (state.getProperty(indexedProperty(balanceTimelineGroupPrefix, index), 0));
+        event.targetRole = static_cast<int> (state.getProperty(indexedProperty(balanceTimelineTargetRolePrefix, index), 0));
+        event.startPpq = static_cast<double> (state.getProperty(indexedProperty(balanceTimelineStartPrefix, index), 0.0));
+        event.endPpq = static_cast<double> (state.getProperty(indexedProperty(balanceTimelineEndPrefix, index), 0.0));
+        event.lastSeenPpq = static_cast<double> (state.getProperty(indexedProperty(balanceTimelineLastSeenPrefix, index), event.endPpq));
+        const auto inferredSectionIndex = balanceTimelineSectionIndexFor(event.lastSeenPpq);
+        event.sectionIndex = static_cast<int> (state.getProperty(indexedProperty(balanceTimelineSectionIndexPrefix, index), inferredSectionIndex));
+        event.sectionKind = static_cast<int> (state.getProperty(
+            indexedProperty(balanceTimelineSectionKindPrefix, index),
+            static_cast<int> (balanceTimelineSectionKindForIndex(event.sectionIndex))));
+        event.sectionStartPpq = static_cast<double> (state.getProperty(
+            indexedProperty(balanceTimelineSectionStartPrefix, index),
+            static_cast<double> (event.sectionIndex) * balanceTimelineSectionLengthPpq));
+        event.sectionEndPpq = static_cast<double> (state.getProperty(
+            indexedProperty(balanceTimelineSectionEndPrefix, index),
+            event.sectionStartPpq + balanceTimelineSectionLengthPpq));
+        event.correctionDb = static_cast<float> (state.getProperty(indexedProperty(balanceTimelineCorrectionPrefix, index), 0.0f));
+        event.severity = static_cast<float> (state.getProperty(indexedProperty(balanceTimelineSeverityPrefix, index), 0.0f));
+        event.hits = static_cast<int> (state.getProperty(indexedProperty(balanceTimelineHitsPrefix, index), 1));
+        event.resolved = static_cast<bool> (state.getProperty(indexedProperty(balanceTimelineResolvedPrefix, index), false));
+
+        snapshot.events[static_cast<size_t> (snapshot.count)] = event;
+        ++snapshot.count;
+    }
+
+    return snapshot;
+}
 } // namespace
 
 void PluginState::writeToBlock(
@@ -225,6 +330,10 @@ void PluginState::writeToBlock(
     const ResonanceSnapshot& learnedResonances,
     const RideMemorySnapshot& rideMemory,
     const RideTimelineSnapshot& rideTimelineMemory,
+    const BalanceTimelineSnapshot& balanceTimelineMemory,
+    float levelRiderTargetRms,
+    float levelRiderHeldGainDb,
+    bool levelRiderHasHeldGain,
     juce::MemoryBlock& destination)
 {
     auto state = apvts.copyState();
@@ -233,6 +342,10 @@ void PluginState::writeToBlock(
     writeLearnedResonances(state, learnedResonances);
     writeRideMemory(state, rideMemory);
     writeRideTimelineMemory(state, rideTimelineMemory);
+    writeBalanceTimelineMemory(state, balanceTimelineMemory);
+    state.setProperty(levelRiderTargetRmsProperty, juce::jlimit(0.0f, 0.6f, levelRiderTargetRms), nullptr);
+    state.setProperty(levelRiderHeldGainDbProperty, juce::jlimit(-36.0f, 24.0f, levelRiderHeldGainDb), nullptr);
+    state.setProperty(levelRiderHasHeldGainProperty, levelRiderHasHeldGain, nullptr);
 
     juce::MemoryOutputStream stream { destination, true };
     state.writeToStream(stream);
@@ -253,6 +366,10 @@ RestoredPluginState PluginState::restoreFromData(
         restored.learnedResonances = readLearnedResonances(state);
         restored.rideMemory = readRideMemory(state);
         restored.rideTimelineMemory = readRideTimelineMemory(state);
+        restored.balanceTimelineMemory = readBalanceTimelineMemory(state);
+        restored.levelRiderTargetRms = static_cast<float> (state.getProperty(levelRiderTargetRmsProperty, 0.0f));
+        restored.levelRiderHeldGainDb = static_cast<float> (state.getProperty(levelRiderHeldGainDbProperty, 0.0f));
+        restored.levelRiderHasHeldGain = static_cast<bool> (state.getProperty(levelRiderHasHeldGainProperty, false));
     }
 
     if (state.isValid())

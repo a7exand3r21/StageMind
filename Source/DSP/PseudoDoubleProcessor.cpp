@@ -40,15 +40,15 @@ void PseudoDoubleProcessor::process(juce::AudioBuffer<float>& buffer, const Pseu
         const auto dryLeft = left[sample];
         const auto dryRight = right[sample];
         const auto doubleAmount = amount.getNextValue();
-        const auto wetGain = doubleAmount * (0.24f + doubleAmount * 0.12f);
+        const auto wetGain = doubleAmount * (0.32f + doubleAmount * 0.24f);
         const auto delayedLeftShort = readDelay(0, leftShortDelaySamples);
         const auto delayedRightShort = readDelay(1, rightShortDelaySamples);
         const auto delayedLeftLong = readDelay(0, leftLongDelaySamples);
         const auto delayedRightLong = readDelay(1, rightLongDelaySamples);
         const auto drySide = (dryLeft - dryRight) * 0.5f;
-        const auto sideLift = drySide * doubleAmount * 0.10f;
-        const auto wetLeft = delayedRightShort * 0.72f - delayedLeftLong * 0.32f + delayedRightLong * 0.16f;
-        const auto wetRight = delayedLeftShort * 0.72f - delayedRightLong * 0.32f + delayedLeftLong * 0.16f;
+        const auto sideLift = drySide * doubleAmount * 0.18f;
+        const auto wetLeft = delayedRightShort * 0.82f - delayedLeftLong * 0.40f + delayedRightLong * 0.24f;
+        const auto wetRight = delayedLeftShort * 0.82f - delayedRightLong * 0.40f + delayedLeftLong * 0.24f;
 
         left[sample] = dryLeft + wetLeft * wetGain + sideLift;
         right[sample] = dryRight + wetRight * wetGain - sideLift;

@@ -47,6 +47,12 @@ inline constexpr auto linkMode = "link_mode";
 inline constexpr auto pluginMode = "plugin_mode";
 inline constexpr auto autoAssistMode = "auto_assist_mode";
 inline constexpr auto motionPreset = "motion_preset";
+inline constexpr auto stageGainMode = "stage_gain_mode";
+inline constexpr auto stageGainMeterMode = "stage_gain_meter_mode";
+inline constexpr auto stageGainTargetDb = "stage_gain_target_db";
+inline constexpr auto stageGainThresholdVu = "stage_gain_threshold_vu";
+inline constexpr auto stageGainCeilingDb = "stage_gain_ceiling_db";
+inline constexpr auto stageGainResponse = "stage_gain_response";
 } // namespace ids
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

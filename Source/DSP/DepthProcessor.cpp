@@ -12,12 +12,12 @@ void DepthProcessor::prepare(double sampleRate, int)
     reflectionDelaySamples = std::max(1, static_cast<int> (currentSampleRate * 0.012));
     feedbackDelaySamples = std::max(1, static_cast<int> (currentSampleRate * 0.047));
     reflectionTapSamples = {
-        std::max(1, static_cast<int> (currentSampleRate * 0.0085)),
-        std::max(1, static_cast<int> (currentSampleRate * 0.0140)),
-        std::max(1, static_cast<int> (currentSampleRate * 0.0235)),
-        std::max(1, static_cast<int> (currentSampleRate * 0.0370))
+        std::max(1, static_cast<int> (currentSampleRate * 0.0070)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0130)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0250)),
+        std::max(1, static_cast<int> (currentSampleRate * 0.0410))
     };
-    reflectionTapGains = { 0.48f, 0.34f, 0.24f, 0.16f };
+    reflectionTapGains = { 0.68f, 0.48f, 0.34f, 0.24f };
     delayBuffer.setSize(maxChannels, delayBufferSize, false, true, false);
     amount.reset(currentSampleRate, 0.08);
     presenceReduction.reset(currentSampleRate, 0.08);
@@ -54,9 +54,9 @@ void DepthProcessor::process(juce::AudioBuffer<float>& buffer, const DepthConfig
         const auto depth = amount.getNextValue();
         const auto presenceCut = presenceReduction.getNextValue();
         const auto wetAmount = earlyReflectionAmount.getNextValue();
-        const auto dryScale = 1.0f - depth * 0.14f;
-        const auto wetGain = depth * wetAmount * (0.08f + depth * 0.18f);
-        const auto feedbackGain = depth * wetAmount * 0.16f;
+        const auto dryScale = 1.0f - depth * 0.28f;
+        const auto wetGain = depth * wetAmount * (0.16f + depth * 0.34f);
+        const auto feedbackGain = depth * wetAmount * 0.26f;
 
         std::array<float, maxChannels> dry {};
 
@@ -73,7 +73,7 @@ void DepthProcessor::process(juce::AudioBuffer<float>& buffer, const DepthConfig
 
         for (int channel = 0; channel < numChannels; ++channel)
         {
-            auto wet = readDelay(channel, reflectionDelaySamples) * 0.22f;
+            auto wet = readDelay(channel, reflectionDelaySamples) * 0.34f;
 
             for (int tap = 0; tap < reflectionTapCount; ++tap)
             {

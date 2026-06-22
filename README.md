@@ -13,7 +13,7 @@ requires prior written permission from the author. See `LICENSE`.
 
 ## MVP Status
 
-Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.9.2 makes the Character controls more audible: Clean Up now has its own role-aware tone path, Resonance rides more decisively, and Double uses stronger asymmetric micro-taps.
+Current scope: MVP4 Spatial and MVP5 StageMind Link foundation are finalized. StageMind Node 0.11.3 makes manual intent stronger: Static/Off Stage Gain blocks Director Output Trim automation, manual ducking bypass is respected, Director trim is capped to +/-3 dB, and idle logging is quieter.
 
 Current UI direction: bright hardware processor interface with a rounded white chassis, dark glass selector strip, five vertical modules, cyan glow accents, segmented meters, dotted Stage View grid, and custom knob/dropdown/button styling.
 
@@ -45,6 +45,18 @@ Finalization note: `docs/MVP4_MVP5_FINALIZATION.md`.
 0.9.0 RC note: `docs/STAGEMIND_NODE_0_9_0_RC.md`.
 0.9.1 RC note: `docs/STAGEMIND_NODE_0_9_1_RC.md`.
 0.9.2 RC note: `docs/STAGEMIND_NODE_0_9_2_RC.md`.
+0.9.3 RC note: `docs/STAGEMIND_NODE_0_9_3_RC.md`.
+0.9.4 RC note: `docs/STAGEMIND_NODE_0_9_4_RC.md`.
+0.9.5 RC note: `docs/STAGEMIND_NODE_0_9_5_RC.md`.
+0.9.6 RC note: `docs/STAGEMIND_NODE_0_9_6_RC.md`.
+0.9.7 RC note: `docs/STAGEMIND_NODE_0_9_7_RC.md`.
+0.9.8 RC note: `docs/STAGEMIND_NODE_0_9_8_RC.md`.
+0.9.9 RC note: `docs/STAGEMIND_NODE_0_9_9_RC.md`.
+0.10.0 RC note: `docs/STAGEMIND_NODE_0_10_0_RC.md`.
+0.11.0 RC note: `docs/STAGEMIND_NODE_0_11_0_RC.md`.
+0.11.1 RC note: `docs/STAGEMIND_NODE_0_11_1_RC.md`.
+0.11.2 RC note: `docs/STAGEMIND_NODE_0_11_2_RC.md`.
+0.11.3 RC note: `docs/STAGEMIND_NODE_0_11_3_RC.md`.
 
 Implemented in this repository:
 
@@ -55,7 +67,7 @@ Implemented in this repository:
 - APVTS registry with the canonical parameters from the technical spec.
 - Basic processor/editor split.
 - MVP 1 spatial DSP path:
-  - output gain;
+  - output trim;
   - Mid/Side width;
   - mono low-end;
   - side high-pass;
@@ -81,11 +93,37 @@ Implemented in this repository:
   - Clean Up macro mapped to detector threshold;
   - Resonance macro mapped to suppression amount;
   - focused DSP tests with artificial peaks.
+- Stage Gain 0.10.0:
+  - `Off`, `Static`, and `Ride` modes;
+  - `Target`, `Threshold`, `Ceiling`, and `Response` controls;
+  - `Analyze` button for Static Analyze & Hold;
+  - applied gain status in the Node UI;
+  - held Static correction saved in the DAW project state.
+- Stage Gain 0.11.0:
+  - meter modes: `dBFS`, `VU`, `RMS`, `LUFS M`, `LUFS S`, `LUFS I`;
+  - fixed-latency look-ahead ceiling limiter;
+  - Director `Analyze All` command for linked Nodes in the selected group.
+- Diagnostics 0.11.1:
+  - session CSV log in `Documents\StageMind\Logs`;
+  - per-instance snapshots once per second;
+  - explicit events for Director auto decisions, Link commands, Auto Assist, Stage Gain Analyze, Analyze All, host transport, and audio prepare/release.
+- Stability 0.11.2:
+  - auto ducking does not flip a target between several ducking modes once one active ducking path is already armed;
+  - Director balance no longer boosts Output Trim beyond `+3 dB`;
+  - Director balance skips boost decisions when local Stage Gain is already applying a strong boost;
+  - Output Trim is applied before the Stage Gain ceiling limiter, so boosted trims are included in the final peak control;
+  - Director diagnostic snapshots include group node counts.
+- Manual intent 0.11.3:
+  - Director Balance trims only Nodes in `Stage Gain: Ride`;
+  - `Stage Gain: Static` and `Off` stop Director Output Trim automation on that Node;
+  - Director Output Trim range is capped to `-3 dB` / `+3 dB`;
+  - disabling `SC Enable` on an already-configured ducking path blocks Auto from re-enabling it;
+  - periodic diagnostic snapshots stop while the host transport is stopped.
 - MVP 4 spatial enhancement path:
   - MotionProcessor with role-limited side motion plus gentle left/right movement for allowed roles;
   - Motion presets: Slow Drift, Orbit, Pulse, and Wide Sweep;
   - DepthProcessor as a zero-latency dry path with room-like early reflections, damping, and short feedback;
-  - PseudoDoubleProcessor for allowed roles with a visible `Double` control in the Node UI;
+  - PseudoDoubleProcessor for allowed roles with a visible `Doubler` control in the Node UI;
   - correlation safety that reduces risky width/double/motion;
   - basic factory programs exposed through the host;
   - focused DSP tests for dry-path and wet-path behavior.
@@ -128,9 +166,11 @@ Implemented in this repository:
   - resonance suppression now rides learned frequencies instead of applying a static cut during silence;
   - Auto mode can apply stable Link Assist actions without pressing `Apply Tip`;
   - Auto sidechain actions select `StageMind Link`, turn on `SC Enable`, and use peer activity as a control envelope;
-  - broad Suno Drums vs harmonic instrument conflicts can select `Make Space` automatically;
+  - broad Suno Drums vs harmonic instrument conflicts can select broad ducking automatically;
+  - Auto Balance level rider learns a working stem loudness and smooths loud/quiet section jumps before Output Trim;
+  - Director Group Balance Assist compares active Nodes by role and sends gentle Output Trim corrections;
   - Auto scans all active peers in the linked group and chooses the strongest local conflict, instead of using only the single UI peer;
-  - Director sees target Width / Depth / SC Mode state and marks already-applied conflict actions as `resolved`.
+  - Director sees target Width / Depth / Ducking state and marks already-applied conflict actions as `resolved`.
   - Director Auto can send guarded correction commands to target Nodes that are also set to `Auto`;
   - automatic Director sidechain commands use the conflict peer as the StageMind Link control source;
   - Director Auto runs from the Director processor timer, so the Director UI does not need to stay open.
@@ -203,7 +243,7 @@ Basic use:
 
 1. Put StageMind Node on a Mixer Insert.
 2. Choose the track role.
-3. Adjust Width and Output.
+3. Adjust Width and Output Trim.
 4. Watch the correlation and meters.
 5. Use Mono Safe if stereo compatibility is risky.
 
@@ -213,7 +253,7 @@ Sidechain use:
 2. Route the source insert into the target as a sidechain-only send in FL Studio.
 3. Set `Trigger` to `External Sidechain`.
 4. Enable `SC Enable`.
-5. Choose `SC Mode`.
+5. Choose `Ducking`.
 6. Raise `SC Amount`.
 7. Use `SC Listen` if you need to confirm that FL routing is reaching the plugin.
 
@@ -237,14 +277,14 @@ Current Learn behavior:
 - does not add host-facing parameters yet;
 - is saved in the DAW project state, not as a separate visible host parameter.
 
-Motion / depth / double:
+Motion / depth / doubler:
 
 1. Use `Motion` gently on pads, FX, percussion, and wide background parts.
 2. Choose a `Motion Preset`: `Slow Drift` is subtle, `Orbit` moves wider, `Pulse` is faster, `Wide Sweep` gives the widest left/right movement.
-3. Use `Depth` to push a part slightly back with early room-like reflections.
-4. Use `Double` when the selected role allows pseudo-doubling. It now uses asymmetric micro-taps, so mono guitars/vocals should become audibly wider or thicker.
+3. Use `Depth` to push a part back with darker direct tone and stronger early room-like reflections.
+4. Use `Doubler` when the selected role allows pseudo-doubling. It now uses stronger asymmetric micro-taps, so mono guitars/vocals should become audibly wider or thicker.
 5. Mono Safe reduces or disables risky widening behavior.
-6. If correlation drops below the active safety threshold, StageMind gradually reduces width, motion, and double.
+6. If correlation drops below the active safety threshold, StageMind gradually reduces width, motion, and doubler.
 
 StageMind Link:
 
@@ -277,7 +317,7 @@ Link Assist actions:
 The action button writes normal plugin parameters. It is still a manual user action.
 If the suggested action is already reflected in the current controls, the suggestion line and button show `Applied`, and the button stays disabled.
 
-From 0.6.1, the line above the action button previews the exact action. Manual sidechain actions also say that routing and `SC Enable` remain manual. This is intentional for user-approved clicks: manual `Apply Tip` may set `SC Mode`, but it does not silently arm sidechain behavior.
+From 0.6.1, the line above the action button previews the exact action. Manual sidechain actions also say that routing and `SC Enable` remain manual. This is intentional for user-approved clicks: manual `Apply Tip` may set ducking mode, but it does not silently arm sidechain behavior.
 
 From 0.6.2, the preview line is held briefly to avoid flicker while the same conflict is still active. After applying an action, the preview line shows `Resolved`.
 
@@ -298,6 +338,16 @@ Auto Assist:
 
 Auto Assist can start resonance learning, gently raise low Clean Up / Resonance values, and apply stable Link Assist corrections. For sidechain actions it can select `Trigger: StageMind Link`, enable `SC Enable`, and use the conflict peer activity as the control envelope. It still does not transfer audio between instances.
 
+From 0.9.5, Auto Assist also runs Auto Balance in Node mode. It learns a working RMS target for the stem, saves that target in the DAW project state, and applies a slow level rider before `Output Trim`. This is not the FL Studio mixer fader. The DAW fader remains the final mix control.
+
+From 0.9.6, Director Auto can also send small `Output Trim` corrections to linked Nodes that are set to `Auto`. This is role-aware: it does not force all stems to the same RMS.
+
+From 0.9.7, Director Auto also learns coarse PPQ areas where role-aware group balance needed correction. Director Memory now shows separate `Timeline` and `Balance` counts. Balance memory is not applied blindly: live level deviation still has to confirm the problem, so the trim cannot run away just because playback passed a remembered section.
+
+From 0.9.8, Director Auto uses a deeper role priority loudness model. Vocal, kick, bass, drums, guitars/leads, pads, and FX have different target offsets, priority weights, deadbands, and correction speeds. This means a pad at vocal loudness is treated as too forward, while a lead vocal that falls behind drums/bass can get a stronger guarded boost.
+
+From 0.9.9, Balance Timeline Memory stores automatic PPQ sections. The first sections are labeled `Intro`, `Verse`, `Chorus`, and `Drop`; later sections are shown as `Section N`. These labels are host-timeline buckets, not DAW arrangement markers.
+
 Director mode:
 
 1. Put normal StageMind Node instances on tracks you want to observe.
@@ -312,7 +362,7 @@ Director mode passes audio through unchanged, does not publish itself as a Node,
 
 From 0.7.1, Director keeps recently found conflicts in the list. When a conflict clears, the row stays visible with `resolved`, so you can still see what was conflicting.
 
-From 0.7.2, active Director rows can be applied with `Apply to #...`. This sends a one-shot command to the target Node. It changes only the same existing parameters as local Link Assist: Width, Depth, or `SC Mode`. It does not enable sidechain routing, does not turn on `SC Enable`, does not transfer audio, and does not run in the background.
+From 0.7.2, active Director rows can be applied with `Apply to #...`. This sends a one-shot command to the target Node. It changes only the same existing parameters as local Link Assist: Width, Depth, or Ducking mode. It does not enable sidechain routing, does not turn on `SC Enable`, does not transfer audio, and does not run in the background.
 
 From 0.7.3, Director draws active conflict arrows directly on the scene map. The arrow points from the peer/source Node toward the target Node that can receive the correction. Director also shows a compact overview of Groups 1-16 as `nodes/active`, and the small group arrow buttons jump between linked groups.
 
@@ -333,4 +383,4 @@ The plugin unregisters itself from StageMind Link when FL actually destroys the 
 Sidechain status:
 
 - `SC Listen: Sidechain Only` is an audition mode and takes priority in the status line.
-- `SC Mode: Off` is reported as off even when an external sidechain signal is present.
+- `Ducking: Off` is reported as off even when an external sidechain signal is present.

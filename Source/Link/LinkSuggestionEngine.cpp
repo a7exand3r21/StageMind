@@ -132,7 +132,7 @@ LinkSuggestion LinkSuggestionEngine::evaluate(const LinkSuggestionInput& input) 
             LinkSuggestionKind::KickBass,
             0.68f + lowOverlap * 0.25f,
             "Conflict: low overlap",
-            "Both linked nodes are active in the low band. Set Kick Duck if the drum source should open space in the bass.",
+            "Both linked nodes are active in the low band. Let the kick/drum peer duck bass lows.",
             "Set Kick Duck",
             "Applied: Kick Duck");
     }
@@ -186,9 +186,9 @@ LinkSuggestion LinkSuggestionEngine::evaluate(const LinkSuggestionInput& input) 
             LinkSuggestionKind::DrumsInstrumentDucking,
             0.52f + drumOverlap * 0.32f,
             "Conflict: drums vs instrument",
-            "The drum stem and this instrument overlap in low-mid or presence energy. Use Make Space for a broad stem-safe duck.",
-            "Set Make Space",
-            "Applied: Make Space");
+            "The drum stem and this instrument overlap in low-mid or presence energy. Use a broad duck so drums push this track back.",
+            "Set Broad Duck",
+            "Applied: Broad Duck");
     }
 
     if (isPadLike(input.currentRole)
@@ -235,7 +235,7 @@ LinkSuggestionAction LinkSuggestionEngine::actionFor(LinkSuggestionKind kind) no
 
         case LinkSuggestionKind::KickBass:
             action.available = true;
-            action.previewMessage = "SC Mode -> Kick Duck";
+            action.previewMessage = "Ducking -> Kick";
             action.setSidechainMode = true;
             action.sidechainModeIndex = 3;
             action.requiresManualSidechain = true;
@@ -243,7 +243,7 @@ LinkSuggestionAction LinkSuggestionEngine::actionFor(LinkSuggestionKind kind) no
 
         case LinkSuggestionKind::VocalInstrumentDucking:
             action.available = true;
-            action.previewMessage = "SC Mode -> Vocal Duck";
+            action.previewMessage = "Ducking -> Vocal";
             action.setSidechainMode = true;
             action.sidechainModeIndex = 2;
             action.requiresManualSidechain = true;
@@ -251,7 +251,7 @@ LinkSuggestionAction LinkSuggestionEngine::actionFor(LinkSuggestionKind kind) no
 
         case LinkSuggestionKind::SnareInstrumentDucking:
             action.available = true;
-            action.previewMessage = "SC Mode -> Snare Duck";
+            action.previewMessage = "Ducking -> Snare";
             action.setSidechainMode = true;
             action.sidechainModeIndex = 4;
             action.requiresManualSidechain = true;
@@ -259,7 +259,7 @@ LinkSuggestionAction LinkSuggestionEngine::actionFor(LinkSuggestionKind kind) no
 
         case LinkSuggestionKind::LeadPadDucking:
             action.available = true;
-            action.previewMessage = "SC Mode -> Lead Duck";
+            action.previewMessage = "Ducking -> Lead";
             action.setSidechainMode = true;
             action.sidechainModeIndex = 5;
             action.requiresManualSidechain = true;
@@ -267,7 +267,7 @@ LinkSuggestionAction LinkSuggestionEngine::actionFor(LinkSuggestionKind kind) no
 
         case LinkSuggestionKind::DrumsInstrumentDucking:
             action.available = true;
-            action.previewMessage = "SC Mode -> Make Space";
+            action.previewMessage = "Ducking -> Broad";
             action.setSidechainMode = true;
             action.sidechainModeIndex = 1;
             action.requiresManualSidechain = true;

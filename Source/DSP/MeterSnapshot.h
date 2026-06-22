@@ -17,6 +17,14 @@ struct MeterSnapshot
     std::atomic<float> correlation { 1.0f };
     std::atomic<float> gainReductionDb { 0.0f };
     std::atomic<float> resonanceReductionDb { 0.0f };
+    std::atomic<int> levelRideActive { 0 };
+    std::atomic<float> levelRideGainDb { 0.0f };
+    std::atomic<float> levelRideTargetRms { 0.0f };
+    std::atomic<float> levelRideTargetDb { -120.0f };
+    std::atomic<float> levelRideOutputPeakDb { -120.0f };
+    std::atomic<int> levelRideHeld { 0 };
+    std::atomic<int> levelRideAnalyzing { 0 };
+    std::atomic<int> levelRideMode { 0 };
     std::atomic<int> autoAssistState { 0 };
     std::atomic<float> autoAssistProgress { 0.0f };
     std::atomic<int> autoAssistActionKind { 0 };
@@ -49,6 +57,11 @@ struct MeterSnapshot
     std::atomic<float> linkPeerBandLowMid { 0.0f };
     std::atomic<float> linkPeerBandPresence { 0.0f };
     std::atomic<float> linkPeerBandAir { 0.0f };
+    std::atomic<int> directorBalanceActive { 0 };
+    std::atomic<int> directorBalanceTargetRole { 0 };
+    std::atomic<int> directorBalanceMemoryEvents { 0 };
+    std::atomic<float> directorBalanceDeviationDb { 0.0f };
+    std::atomic<float> directorBalanceCorrectionDb { 0.0f };
     AtomicResonanceSnapshot resonances;
     AtomicResonanceSnapshot learnedResonances;
 };

@@ -164,12 +164,12 @@ void instrumentAgainstSunoDrumsSuggestsMakeSpaceMode()
     const auto suggestion = stagemind::LinkSuggestionEngine::evaluate(input);
     expect(
         suggestion.kind == stagemind::LinkSuggestionKind::DrumsInstrumentDucking,
-        "instrument against Suno Drums should suggest broad Make Space ducking");
+        "instrument against Suno Drums should suggest broad ducking");
 
     const auto action = stagemind::LinkSuggestionEngine::actionFor(suggestion.kind);
     expect(
         action.available && action.setSidechainMode && action.sidechainModeIndex == 1,
-        "drums instrument action should select Make Space");
+        "drums instrument action should select broad ducking");
 }
 
 void padAgainstLeadSuggestsLeadPadDuckingMode()

@@ -5,6 +5,8 @@
 #include "../Model/SafetyMode.h"
 #include "../Model/SidechainConflictMode.h"
 #include "../Model/SidechainListenMode.h"
+#include "../Model/StageGainMeterMode.h"
+#include "../Model/StageGainMode.h"
 #include "../Model/TrackRole.h"
 #include "../Model/TriggerMode.h"
 #include "../UI/Theme.h"
@@ -423,6 +425,31 @@ juce::String timelineEventText(const RideTimelineEvent& event)
     return text;
 }
 
+juce::String balanceSectionText(const BalanceTimelineEvent& event)
+{
+    const auto kind = static_cast<BalanceTimelineSectionKind> (event.sectionKind);
+    auto text = juce::String(balanceTimelineSectionName(kind));
+    if (kind == BalanceTimelineSectionKind::Section)
+        text += " " + juce::String(event.sectionIndex + 1);
+
+    return text;
+}
+
+juce::String balanceTimelineEventText(const BalanceTimelineEvent& event)
+{
+    auto text = balanceSectionText(event)
+        + " "
+        + ppqText(event.lastSeenPpq)
+        + " balance "
+        + shortLabelForRole(static_cast<TrackRole> (event.targetRole))
+        + " "
+        + juce::String(event.correctionDb, 1)
+        + " dB";
+
+    text += event.resolved ? " resolved" : " pending";
+    return text;
+}
+
 juce::String paddedGroupNumber(int group)
 {
     return group < 10 ? "0" + juce::String(group) : juce::String(group);
@@ -463,7 +490,8 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     setLookAndFeel(&hardwareLookAndFeel);
     setResizable(true, true);
     setResizeLimits(1040, 640, 1600, 980);
-    setSize(1280, 760);
+    const auto [savedWidth, savedHeight] = processor.getSavedEditorSize();
+    setSize(savedWidth, savedHeight);
 
     titleLabel.setText("", juce::dontSendNotification);
     titleLabel.setColour(juce::Label::textColourId, theme::text);
@@ -485,6 +513,8 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     auto linkSourceRoleNames = makeRoleNamesWithUnknown();
     linkSourceRoleNames.set(0, "Any Role");
     setupCombo(linkSourceRoleCombo, linkSourceRoleNames);
+    setupCombo(stageGainModeCombo, makeStageGainModeNames());
+    setupCombo(stageGainMeterModeCombo, makeStageGainMeterModeNames());
     modeCombo.setComponentID("miniCombo");
     autoAssistCombo.setComponentID("miniCombo");
     roleCombo.setComponentID("headerCombo");
@@ -494,6 +524,7 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     sidechainEnableButton.setClickingTogglesState(true);
     linkEnableButton.setClickingTogglesState(true);
     sidechainEnableButton.setComponentID("pillGlowButton");
+    stageGainAnalyzeButton.setComponentID("pillGlowButton");
     linkEnableButton.setComponentID("glowButton");
     linkApplyTipButton.setComponentID("softButton");
     resonanceLearnButton.setComponentID("pillGlowButton");
@@ -501,10 +532,12 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     linkEnableButton.setColour(juce::TextButton::textColourOffId, theme::accent.darker(0.15f));
     resonanceLearnButton.setColour(juce::TextButton::textColourOffId, theme::textMuted);
     setupButton(sidechainEnableButton);
+    setupButton(stageGainAnalyzeButton);
     setupButton(linkEnableButton);
     setupButton(linkApplyTipButton);
     setupButton(directorApplyTipButton);
     setupButton(directorLearnMixButton);
+    setupButton(directorAnalyzeAllButton);
     setupButton(directorClearMemoryButton);
     setupButton(directorPreviousGroupButton);
     setupButton(directorNextGroupButton);
@@ -515,6 +548,10 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     resonanceLearnButton.onClick = [this]
     {
         processor.beginResonanceLearn();
+    };
+    stageGainAnalyzeButton.onClick = [this]
+    {
+        processor.beginStageGainAnalyze();
     };
     linkApplyTipButton.onClick = [this]
     {
@@ -527,6 +564,14 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     directorLearnMixButton.onClick = [this]
     {
         processor.beginRideMemoryLearn();
+    };
+    directorAnalyzeAllButton.onClick = [this]
+    {
+        const auto sent = processor.requestStageGainAnalyzeForCurrentGroup();
+        directorCommandStatus = sent > 0
+            ? "Analyze All sent to " + juce::String(sent) + " Nodes"
+            : "No linked Nodes to analyze";
+        directorCommandStatusFrames = sent > 0 ? 90 : 70;
     };
     directorClearMemoryButton.onClick = [this]
     {
@@ -550,24 +595,40 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     layoutLabeledCombo(sidechainModeLabel, sidechainModeCombo, {});
     layoutLabeledCombo(sidechainListenLabel, sidechainListenCombo, {});
     layoutLabeledCombo(linkSourceRoleLabel, linkSourceRoleCombo, {});
+    layoutLabeledCombo(stageGainModeLabel, stageGainModeCombo, {});
+    layoutLabeledCombo(stageGainMeterModeLabel, stageGainMeterModeCombo, {});
     modeLabel.setText("MODE", juce::dontSendNotification);
     autoAssistLabel.setText("AUTO", juce::dontSendNotification);
     roleLabel.setText("ROLE", juce::dontSendNotification);
     safetyLabel.setText("PRESET", juce::dontSendNotification);
     triggerLabel.setText("TRIGGER", juce::dontSendNotification);
     motionPresetLabel.setText("MOTION", juce::dontSendNotification);
-    sidechainModeLabel.setText("MAKE SPACE", juce::dontSendNotification);
+    sidechainModeLabel.setText("DUCKING", juce::dontSendNotification);
     sidechainListenLabel.setText("SC LISTEN", juce::dontSendNotification);
     linkSourceRoleLabel.setText("ROLE", juce::dontSendNotification);
+    stageGainModeLabel.setText("GAIN", juce::dontSendNotification);
+    stageGainMeterModeLabel.setText("METER", juce::dontSendNotification);
 
     setupSlider(widthSlider, widthLabel, "Width");
     setupSlider(depthSlider, depthLabel, "Depth");
     setupSlider(motionSlider, motionLabel, "Motion");
     setupSlider(cleanUpSlider, cleanUpLabel, "Clean Up");
     setupSlider(resonanceSlider, resonanceLabel, "Resonance");
-    setupSlider(doubleSlider, doubleLabel, "Double");
-    setupSlider(outputSlider, outputLabel, "Output");
+    setupSlider(doubleSlider, doubleLabel, "Doubler");
+    setupSlider(outputSlider, outputLabel, "Output Trim");
     setupSlider(sidechainAmountSlider, sidechainAmountLabel, "SC Amount");
+    setupSlider(stageGainTargetSlider, stageGainTargetLabel, "Target");
+    setupSlider(stageGainThresholdSlider, stageGainThresholdLabel, "Threshold");
+    setupSlider(stageGainCeilingSlider, stageGainCeilingLabel, "Ceiling");
+    setupSlider(stageGainResponseSlider, stageGainResponseLabel, "Response");
+
+    stageGainTargetSlider.textFromValueFunction = [](double value) { return juce::String(value, 1) + " dB"; };
+    stageGainThresholdSlider.textFromValueFunction = [](double value) { return juce::String(value, 1) + " VU"; };
+    stageGainCeilingSlider.textFromValueFunction = [](double value) { return juce::String(value, 1) + " dB"; };
+    stageGainResponseSlider.textFromValueFunction = [](double value)
+    {
+        return juce::String(static_cast<int> (std::round(value * 100.0))) + "%";
+    };
 
     linkGroupLabel.setText("Group", juce::dontSendNotification);
     linkGroupLabel.setColour(juce::Label::textColourId, theme::textMuted);
@@ -625,6 +686,11 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     autoAssistStatusLabel.setJustificationType(juce::Justification::centred);
     autoAssistStatusLabel.setFont(juce::FontOptions { 10.5f });
     addAndMakeVisible(autoAssistStatusLabel);
+
+    stageGainStatusLabel.setColour(juce::Label::textColourId, theme::textMuted);
+    stageGainStatusLabel.setJustificationType(juce::Justification::centred);
+    stageGainStatusLabel.setFont(juce::FontOptions { 10.5f });
+    addAndMakeVisible(stageGainStatusLabel);
 
     directorStatusLabel.setColour(juce::Label::textColourId, theme::textMuted);
     directorStatusLabel.setJustificationType(juce::Justification::centredRight);
@@ -693,6 +759,8 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     sidechainModeAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::sidechainMode, sidechainModeCombo);
     sidechainListenAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::sidechainListen, sidechainListenCombo);
     linkSourceRoleAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::linkRole, linkSourceRoleCombo);
+    stageGainModeAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::stageGainMode, stageGainModeCombo);
+    stageGainMeterModeAttachment = std::make_unique<ComboBoxAttachment>(apvts, parameters::ids::stageGainMeterMode, stageGainMeterModeCombo);
     sidechainEnableAttachment = std::make_unique<ButtonAttachment>(apvts, parameters::ids::sidechainEnabled, sidechainEnableButton);
     linkEnableAttachment = std::make_unique<ButtonAttachment>(apvts, parameters::ids::linkEnabled, linkEnableButton);
     widthAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::width, widthSlider);
@@ -703,6 +771,10 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
     doubleAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::pseudoDoubleAmount, doubleSlider);
     outputAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::outputGain, outputSlider);
     sidechainAmountAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::sidechainAmount, sidechainAmountSlider);
+    stageGainTargetAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::stageGainTargetDb, stageGainTargetSlider);
+    stageGainThresholdAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::stageGainThresholdVu, stageGainThresholdSlider);
+    stageGainCeilingAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::stageGainCeilingDb, stageGainCeilingSlider);
+    stageGainResponseAttachment = std::make_unique<SliderAttachment>(apvts, parameters::ids::stageGainResponse, stageGainResponseSlider);
 
     syncLinkGroupEditorFromParameter();
     directorModeVisible = isDirectorMode();
@@ -713,6 +785,7 @@ PluginEditor::PluginEditor(PluginProcessor& processorToUse)
 
 PluginEditor::~PluginEditor()
 {
+    processor.setSavedEditorSize(getWidth(), getHeight());
     setLookAndFeel(nullptr);
 }
 
@@ -763,6 +836,7 @@ void PluginEditor::paint(juce::Graphics& g)
 
 void PluginEditor::resized()
 {
+    processor.setSavedEditorSize(getWidth(), getHeight());
     updateVisibleMode();
 
     auto bounds = getLocalBounds().reduced(theme::margin);
@@ -841,9 +915,23 @@ void PluginEditor::resized()
 
         auto meteringModule = nodeLayout.modules[4].reduced(16, 14);
         takeTop(meteringModule, compactHeight ? 42 : 52);
-        const auto meterHeight = juce::jlimit(150, compactHeight ? 230 : 300, meteringModule.getHeight() / 2);
+        const auto meterHeight = juce::jlimit(120, compactHeight ? 180 : 220, meteringModule.getHeight() / 3);
         layoutMeterRow(takeTop(meteringModule, meterHeight), inputMeter, outputMeter, sidechainMeter, reductionMeter);
         correlationLabel.setBounds(takeTop(meteringModule, compactHeight ? 32 : 38).reduced(4, 0));
+        layoutLabeledCombo(stageGainModeLabel, stageGainModeCombo, takeTop(meteringModule, compactHeight ? 38 : 44).reduced(4, 0));
+        layoutLabeledCombo(stageGainMeterModeLabel, stageGainMeterModeCombo, takeTop(meteringModule, compactHeight ? 38 : 44).reduced(4, 0));
+        const auto layoutStageGainRow = [](juce::Rectangle<int> row, juce::Label& label, juce::Slider& slider)
+        {
+            row = row.reduced(4, 1);
+            label.setBounds(row.removeFromLeft(std::min(68, row.getWidth() / 2)));
+            slider.setBounds(row);
+        };
+        layoutStageGainRow(takeTop(meteringModule, compactHeight ? 24 : 28), stageGainTargetLabel, stageGainTargetSlider);
+        layoutStageGainRow(takeTop(meteringModule, compactHeight ? 24 : 28), stageGainThresholdLabel, stageGainThresholdSlider);
+        layoutStageGainRow(takeTop(meteringModule, compactHeight ? 24 : 28), stageGainCeilingLabel, stageGainCeilingSlider);
+        layoutStageGainRow(takeTop(meteringModule, compactHeight ? 24 : 28), stageGainResponseLabel, stageGainResponseSlider);
+        stageGainAnalyzeButton.setBounds(takeTop(meteringModule, compactHeight ? 28 : 32).reduced(8, 3));
+        stageGainStatusLabel.setBounds(takeTop(meteringModule, compactHeight ? 18 : 22).reduced(4, 0));
         resonanceLearnButton.setBounds(takeTop(meteringModule, compactHeight ? 34 : 40).reduced(8, 4));
         takeTop(meteringModule, compactHeight ? 4 : 8);
         resonanceList.setBounds(meteringModule.reduced(4, 0));
@@ -912,6 +1000,7 @@ void PluginEditor::resized()
         directorGroupsLabel.setBounds(takeTop(right, directorGroupsHeight).reduced(4));
         takeTop(right, innerGap);
         directorMemoryLabel.setBounds(takeTop(right, directorMemoryHeight).reduced(4));
+        directorAnalyzeAllButton.setBounds(takeTop(right, directorButtonHeight).reduced(4));
         auto memoryButtons = takeTop(right, directorButtonHeight);
         directorLearnMixButton.setBounds(memoryButtons.removeFromLeft(std::max(1, memoryButtons.getWidth() / 2)).reduced(4));
         directorClearMemoryButton.setBounds(memoryButtons.reduced(4));
@@ -961,7 +1050,7 @@ void PluginEditor::resized()
     stageView.setBounds(left.reduced(4));
 
     auto rightArea = right.reduced(2);
-    const auto meterHeight = clampedInt(rightArea.getHeight() / 3, 86, compactHeight ? 150 : 240);
+    const auto meterHeight = clampedInt(rightArea.getHeight() / 4, 76, compactHeight ? 120 : 170);
     layoutMeterRow(takeTop(rightArea, meterHeight), inputMeter, outputMeter, sidechainMeter, reductionMeter);
     correlationLabel.setBounds(takeTop(rightArea, compactHeight ? 30 : 38).reduced(4));
     layoutLabeledCombo(sidechainModeLabel, sidechainModeCombo, takeTop(rightArea, compactHeight ? 50 : 56).reduced(4));
@@ -980,6 +1069,20 @@ void PluginEditor::resized()
     linkActionPreviewLabel.setBounds(takeTop(rightArea, compactHeight ? 20 : 22).reduced(4));
     linkApplyTipButton.setBounds(takeTop(rightArea, compactHeight ? 26 : 30).reduced(4));
     autoAssistStatusLabel.setBounds(takeTop(rightArea, compactHeight ? 20 : 22).reduced(4));
+    layoutLabeledCombo(stageGainModeLabel, stageGainModeCombo, takeTop(rightArea, compactHeight ? 42 : 48).reduced(4));
+    layoutLabeledCombo(stageGainMeterModeLabel, stageGainMeterModeCombo, takeTop(rightArea, compactHeight ? 42 : 48).reduced(4));
+    const auto layoutStageGainRow = [](juce::Rectangle<int> row, juce::Label& label, juce::Slider& slider)
+    {
+        row = row.reduced(4, 1);
+        label.setBounds(row.removeFromLeft(std::min(72, row.getWidth() / 2)));
+        slider.setBounds(row);
+    };
+    layoutStageGainRow(takeTop(rightArea, compactHeight ? 24 : 28), stageGainTargetLabel, stageGainTargetSlider);
+    layoutStageGainRow(takeTop(rightArea, compactHeight ? 24 : 28), stageGainThresholdLabel, stageGainThresholdSlider);
+    layoutStageGainRow(takeTop(rightArea, compactHeight ? 24 : 28), stageGainCeilingLabel, stageGainCeilingSlider);
+    layoutStageGainRow(takeTop(rightArea, compactHeight ? 24 : 28), stageGainResponseLabel, stageGainResponseSlider);
+    stageGainAnalyzeButton.setBounds(takeTop(rightArea, compactHeight ? 28 : 32).reduced(4));
+    stageGainStatusLabel.setBounds(takeTop(rightArea, compactHeight ? 20 : 22).reduced(4));
 
     resonanceLearnButton.setBounds(takeTop(rightArea, compactHeight ? 30 : 34).reduced(4));
     takeTop(rightArea, compactHeight ? 4 : innerGap);
@@ -1101,6 +1204,8 @@ void PluginEditor::timerCallback()
     const auto autoProgress = juce::jlimit(0.0f, 1.0f, meterData.autoAssistProgress.load(std::memory_order_relaxed));
     const auto autoAction = LinkSuggestionEngine::actionFor(
         static_cast<LinkSuggestionKind> (meterData.autoAssistActionKind.load(std::memory_order_relaxed)));
+    const auto levelRideActive = meterData.levelRideActive.load(std::memory_order_relaxed) != 0;
+    const auto levelRideGainDb = meterData.levelRideGainDb.load(std::memory_order_relaxed);
     juce::String autoText = "Auto off";
     auto autoColour = theme::textMuted;
 
@@ -1119,6 +1224,11 @@ void PluginEditor::timerCallback()
         autoText = "Auto applied: " + juce::String(autoAction.previewMessage);
         autoColour = theme::accent;
     }
+    else if (autoMode == AutoAssistMode::Auto && levelRideActive && std::abs(levelRideGainDb) >= 0.1f)
+    {
+        autoText = "Auto level " + juce::String(levelRideGainDb, 1) + " dB";
+        autoColour = theme::accent;
+    }
     else if (autoMode == AutoAssistMode::Auto && autoState == 3)
     {
         autoText = "Auto resonance rider";
@@ -1135,6 +1245,55 @@ void PluginEditor::timerCallback()
     autoAssistStatusLabel.setText(autoText, juce::dontSendNotification);
     autoAssistStatusLabel.setColour(juce::Label::textColourId, autoColour);
 
+    const auto stageGainMode = stageGainModeFromIndex(
+        static_cast<int> (apvts.getRawParameterValue(parameters::ids::stageGainMode)->load(std::memory_order_relaxed)));
+    const auto stageGainActive = meterData.levelRideActive.load(std::memory_order_relaxed) != 0;
+    const auto stageGainHeld = meterData.levelRideHeld.load(std::memory_order_relaxed) != 0;
+    const auto stageGainAnalyzing = meterData.levelRideAnalyzing.load(std::memory_order_relaxed) != 0;
+    const auto stageGainDb = meterData.levelRideGainDb.load(std::memory_order_relaxed);
+    const auto stageGainTargetDb = meterData.levelRideTargetDb.load(std::memory_order_relaxed);
+    juce::String stageGainText = "Gain off";
+    auto stageGainColour = theme::textMuted;
+
+    stageGainAnalyzeButton.setEnabled(stageGainMode == StageGainMode::Static);
+    if (stageGainMode == StageGainMode::Static)
+    {
+        stageGainAnalyzeButton.setButtonText(stageGainHeld ? "Re-Analyze" : "Analyze");
+        if (stageGainHeld)
+        {
+            stageGainText = "Hold " + juce::String(stageGainDb, 1) + " dB -> "
+                + juce::String(stageGainTargetDb, 1);
+            stageGainColour = theme::accent;
+        }
+        else if (stageGainAnalyzing)
+        {
+            stageGainText = "Analyze armed";
+            stageGainColour = theme::accentWarm;
+        }
+        else
+        {
+            stageGainText = "Static: press Analyze";
+            stageGainColour = theme::warning;
+        }
+    }
+    else if (stageGainMode == StageGainMode::Ride)
+    {
+        stageGainAnalyzeButton.setButtonText("Ride");
+        stageGainText = stageGainActive
+            ? "Ride " + juce::String(stageGainDb, 1) + " dB -> " + juce::String(stageGainTargetDb, 1)
+            : "Ride waiting signal";
+        stageGainColour = stageGainActive ? theme::accent : theme::textMuted;
+    }
+    else
+    {
+        stageGainAnalyzeButton.setButtonText("Analyze");
+        stageGainText = autoMode == AutoAssistMode::Auto ? "Legacy auto level" : "Gain off";
+        stageGainColour = autoMode == AutoAssistMode::Auto ? theme::textMuted : theme::textMuted;
+    }
+
+    stageGainStatusLabel.setText(stageGainText, juce::dontSendNotification);
+    stageGainStatusLabel.setColour(juce::Label::textColourId, stageGainColour);
+
     const auto trigger = triggerModeFromIndex(static_cast<int> (apvts.getRawParameterValue(parameters::ids::triggerMode)->load(std::memory_order_relaxed)));
     const auto sidechainEnabled = apvts.getRawParameterValue(parameters::ids::sidechainEnabled)->load(std::memory_order_relaxed) >= 0.5f;
     const auto sidechainMode = sidechainConflictModeFromIndex(static_cast<int> (apvts.getRawParameterValue(parameters::ids::sidechainMode)->load(std::memory_order_relaxed)));
@@ -1142,7 +1301,7 @@ void PluginEditor::timerCallback()
     const auto listenMode = sidechainListenModeFromIndex(static_cast<int> (apvts.getRawParameterValue(parameters::ids::sidechainListen)->load(std::memory_order_relaxed)));
     const auto sidechainListenSelected = sidechainListenCombo.getSelectedItemIndex() == 1;
 
-    juce::String status = "Sidechain idle";
+    juce::String status = "Ducking idle";
     auto statusColour = theme::textMuted;
 
     if (listenMode == SidechainListenMode::SidechainOnly || sidechainListenSelected)
@@ -1152,42 +1311,42 @@ void PluginEditor::timerCallback()
     }
     else if (trigger == TriggerMode::ExternalSidechain && ! sidechainEnabled)
     {
-        status = "External SC: disabled";
+        status = "Ducking disabled";
         statusColour = theme::warning;
     }
     else if (trigger == TriggerMode::ExternalSidechain && sidechainEnabled && sidechainMode == SidechainConflictMode::Off)
     {
-        status = sidechainActive ? "SC mode off" : "SC off: no signal";
+        status = sidechainActive ? "Ducking off" : "No sidechain signal";
         statusColour = sidechainActive ? theme::textMuted : theme::warning;
     }
     else if (trigger == TriggerMode::ExternalSidechain && sidechainEnabled && ! sidechainActive)
     {
-        status = "No SC signal";
+        status = "No sidechain signal";
         statusColour = theme::warning;
     }
     else if (trigger == TriggerMode::ExternalSidechain && sidechainEnabled)
     {
-        status = "Sidechain dynamic EQ active";
+        status = "External ducking active";
         statusColour = theme::accent;
     }
     else if (trigger == TriggerMode::StageMindLink && ! sidechainEnabled)
     {
-        status = "Link SC: disabled";
+        status = "Link ducking disabled";
         statusColour = theme::warning;
     }
     else if (trigger == TriggerMode::StageMindLink && sidechainEnabled && sidechainMode == SidechainConflictMode::Off)
     {
-        status = "Link SC mode off";
+        status = "Link ducking off";
         statusColour = theme::warning;
     }
     else if (trigger == TriggerMode::StageMindLink && sidechainEnabled && sidechainActive)
     {
-        status = "StageMind Link dynamic EQ active";
+        status = "Link ducking active";
         statusColour = theme::accent;
     }
     else if (trigger == TriggerMode::StageMindLink && sidechainEnabled)
     {
-        status = "Link SC waiting peer";
+        status = "Link ducking waiting";
         statusColour = theme::warning;
     }
 
@@ -1345,12 +1504,12 @@ void PluginEditor::timerCallback()
         if (currentAction.requiresManualSidechain
             && (trigger != TriggerMode::ExternalSidechain || ! sidechainEnabled))
         {
-            linkPreviewText = "SC Mode only; routing manual";
+            linkPreviewText = "Sets ducking; route SC";
             linkPreviewColour = theme::accentWarm;
         }
         else if (currentAction.requiresManualSidechain && ! sidechainActive)
         {
-            linkPreviewText = "No SC signal yet";
+            linkPreviewText = "Waiting sidechain";
             linkPreviewColour = theme::accentWarm;
         }
         else
@@ -1401,9 +1560,18 @@ void PluginEditor::setupSlider(juce::Slider& slider, juce::Label& label, const j
     label.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(label);
 
-    slider.setSliderStyle(labelText == "Output" ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, labelText == "Output" ? 78 : 58, 22);
-    if (labelText == "Output")
+    const auto isOutputSlider = &slider == &outputSlider;
+    const auto isStageGainSlider = &slider == &stageGainTargetSlider
+        || &slider == &stageGainThresholdSlider
+        || &slider == &stageGainCeilingSlider
+        || &slider == &stageGainResponseSlider;
+    slider.setSliderStyle(isOutputSlider || isStageGainSlider ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
+    slider.setTextBoxStyle(
+        isStageGainSlider ? juce::Slider::TextBoxRight : juce::Slider::TextBoxBelow,
+        false,
+        isOutputSlider ? 82 : (isStageGainSlider ? 58 : 58),
+        isStageGainSlider ? 18 : 22);
+    if (isOutputSlider)
     {
         slider.textFromValueFunction = [](double value)
         {
@@ -1699,6 +1867,7 @@ void PluginEditor::updateVisibleMode()
     directorConflictLabel.setVisible(directorMode);
     directorApplyTipButton.setVisible(directorMode);
     directorLearnMixButton.setVisible(directorMode);
+    directorAnalyzeAllButton.setVisible(directorMode);
     directorClearMemoryButton.setVisible(directorMode);
     directorPreviousGroupButton.setVisible(directorMode);
     directorNextGroupButton.setVisible(directorMode);
@@ -1713,6 +1882,8 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     sidechainModeLabel.setVisible(shouldBeVisible);
     sidechainListenLabel.setVisible(shouldBeVisible);
     linkSourceRoleLabel.setVisible(shouldBeVisible);
+    stageGainModeLabel.setVisible(shouldBeVisible);
+    stageGainMeterModeLabel.setVisible(shouldBeVisible);
 
     roleCombo.setVisible(shouldBeVisible);
     safetyCombo.setVisible(shouldBeVisible);
@@ -1720,8 +1891,11 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     sidechainModeCombo.setVisible(shouldBeVisible);
     sidechainListenCombo.setVisible(shouldBeVisible);
     linkSourceRoleCombo.setVisible(shouldBeVisible);
+    stageGainModeCombo.setVisible(shouldBeVisible);
+    stageGainMeterModeCombo.setVisible(shouldBeVisible);
 
     sidechainEnableButton.setVisible(shouldBeVisible);
+    stageGainAnalyzeButton.setVisible(shouldBeVisible);
     resonanceLearnButton.setVisible(shouldBeVisible);
     linkEnableButton.setVisible(shouldBeVisible);
     linkApplyTipButton.setVisible(shouldBeVisible);
@@ -1735,6 +1909,10 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     doubleLabel.setVisible(shouldBeVisible);
     outputLabel.setVisible(shouldBeVisible);
     sidechainAmountLabel.setVisible(shouldBeVisible);
+    stageGainTargetLabel.setVisible(shouldBeVisible);
+    stageGainThresholdLabel.setVisible(shouldBeVisible);
+    stageGainCeilingLabel.setVisible(shouldBeVisible);
+    stageGainResponseLabel.setVisible(shouldBeVisible);
 
     widthSlider.setVisible(shouldBeVisible);
     depthSlider.setVisible(shouldBeVisible);
@@ -1745,6 +1923,10 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     doubleSlider.setVisible(shouldBeVisible);
     outputSlider.setVisible(shouldBeVisible);
     sidechainAmountSlider.setVisible(shouldBeVisible);
+    stageGainTargetSlider.setVisible(shouldBeVisible);
+    stageGainThresholdSlider.setVisible(shouldBeVisible);
+    stageGainCeilingSlider.setVisible(shouldBeVisible);
+    stageGainResponseSlider.setVisible(shouldBeVisible);
 
     stageView.setVisible(shouldBeVisible);
     inputMeter.setVisible(shouldBeVisible);
@@ -1759,6 +1941,7 @@ void PluginEditor::setNodeControlsVisible(bool shouldBeVisible)
     linkSuggestionLabel.setVisible(shouldBeVisible);
     linkActionPreviewLabel.setVisible(shouldBeVisible);
     autoAssistStatusLabel.setVisible(shouldBeVisible);
+    stageGainStatusLabel.setVisible(shouldBeVisible);
 }
 
 void PluginEditor::updateDirectorView()
@@ -1785,7 +1968,9 @@ void PluginEditor::updateDirectorView()
 
     const auto rideMemory = processor.getRideMemorySnapshot();
     const auto rideTimelineMemory = processor.getRideTimelineSnapshot();
+    const auto balanceTimelineMemory = processor.getBalanceTimelineSnapshot();
     const auto transport = processor.getTransportSnapshot();
+    const auto& meterData = processor.getMeters();
     auto resolvedMemoryCount = 0;
     for (const auto& event : rideMemory.events)
         if (event.used && event.resolved)
@@ -1824,9 +2009,50 @@ void PluginEditor::updateDirectorView()
             latestTimelineEvent = &event;
     }
 
+    auto resolvedBalanceTimelineCount = 0;
+    auto groupBalanceTimelineCount = 0;
+    auto groupBalanceSectionCount = 0;
+    auto nearbyBalanceTimelineCount = 0;
+    std::array<bool, maxBalanceTimelineEvents> balanceSectionsSeen {};
+    const auto* nearestBalanceTimelineEvent = static_cast<const BalanceTimelineEvent*> (nullptr);
+    auto nearestBalanceTimelineDistance = 1.0e9;
+    const auto* latestBalanceTimelineEvent = static_cast<const BalanceTimelineEvent*> (nullptr);
+    for (const auto& event : balanceTimelineMemory.events)
+    {
+        if (! event.used || event.group != group)
+            continue;
+
+        ++groupBalanceTimelineCount;
+        const auto sectionIndex = juce::jlimit(0, maxBalanceTimelineEvents - 1, event.sectionIndex);
+        if (! balanceSectionsSeen[static_cast<size_t> (sectionIndex)])
+        {
+            balanceSectionsSeen[static_cast<size_t> (sectionIndex)] = true;
+            ++groupBalanceSectionCount;
+        }
+
+        if (event.resolved)
+            ++resolvedBalanceTimelineCount;
+
+        if (transport.valid && event.contains(transport.ppqPosition, balanceTimelineMergeWindowPpq))
+            ++nearbyBalanceTimelineCount;
+
+        if (transport.valid)
+        {
+            const auto distance = std::abs(event.lastSeenPpq - transport.ppqPosition);
+            if (distance < nearestBalanceTimelineDistance)
+            {
+                nearestBalanceTimelineDistance = distance;
+                nearestBalanceTimelineEvent = &event;
+            }
+        }
+
+        if (latestBalanceTimelineEvent == nullptr || event.lastSeenPpq > latestBalanceTimelineEvent->lastSeenPpq)
+            latestBalanceTimelineEvent = &event;
+    }
+
     const auto autoMode = autoAssistModeFromIndex(static_cast<int> (currentParameterValue(parameters::ids::autoAssistMode)));
     juce::String memoryText;
-    if (rideMemory.learning || rideTimelineMemory.learning)
+    if (rideMemory.learning || rideTimelineMemory.learning || balanceTimelineMemory.learning)
         memoryText = "Memory learning\n";
     else if (autoMode == AutoAssistMode::Auto)
         memoryText = "Memory auto\n";
@@ -1837,23 +2063,53 @@ void PluginEditor::updateDirectorView()
         + " events, " + juce::String(resolvedMemoryCount) + " resolved";
     memoryText += "\nTimeline " + juce::String(groupTimelineCount)
         + " / " + juce::String(resolvedTimelineCount) + " resolved";
+    memoryText += "\nBalance " + juce::String(groupBalanceTimelineCount)
+        + " / " + juce::String(resolvedBalanceTimelineCount) + " resolved";
+    memoryText += ", " + juce::String(groupBalanceSectionCount) + " sections";
     memoryText += transport.valid
         ? "\n" + ppqText(transport.ppqPosition)
             + (transport.playing ? " play" : " stop")
-            + ", " + juce::String(nearbyTimelineCount) + " nearby"
+            + ", " + juce::String(nearbyTimelineCount) + " ride"
+            + ", " + juce::String(nearbyBalanceTimelineCount) + " balance"
         : "\nPPQ unavailable";
+
+    if (meterData.directorBalanceActive.load(std::memory_order_relaxed) != 0)
+    {
+        const auto role = static_cast<TrackRole> (meterData.directorBalanceTargetRole.load(std::memory_order_relaxed));
+        const auto correction = meterData.directorBalanceCorrectionDb.load(std::memory_order_relaxed);
+        const auto deviation = meterData.directorBalanceDeviationDb.load(std::memory_order_relaxed);
+        memoryText += "\nBalance "
+            + shortLabelForRole(role)
+            + " "
+            + juce::String(correction, 1)
+            + " dB, dev "
+            + juce::String(deviation, 1);
+    }
 
     if (const auto* eventToShow = nearestTimelineEvent != nullptr ? nearestTimelineEvent : latestTimelineEvent)
         memoryText += "\n" + timelineEventText(*eventToShow);
+    if (const auto* balanceEventToShow = nearestBalanceTimelineEvent != nullptr ? nearestBalanceTimelineEvent : latestBalanceTimelineEvent)
+        memoryText += "\n" + balanceTimelineEventText(*balanceEventToShow);
     directorMemoryLabel.setText(memoryText, juce::dontSendNotification);
     directorMemoryLabel.setColour(
         juce::Label::textColourId,
-        rideMemory.count > 0 || rideTimelineMemory.count > 0 || rideMemory.learning || rideTimelineMemory.learning
+        rideMemory.count > 0
+            || rideTimelineMemory.count > 0
+            || balanceTimelineMemory.count > 0
+            || rideMemory.learning
+            || rideTimelineMemory.learning
+            || balanceTimelineMemory.learning
             ? theme::accent
             : theme::textMuted);
-    directorLearnMixButton.setButtonText(rideMemory.learning ? "Learning" : "Learn Mix");
+    directorLearnMixButton.setButtonText(
+        rideMemory.learning || rideTimelineMemory.learning || balanceTimelineMemory.learning ? "Learning" : "Learn Mix");
     directorClearMemoryButton.setEnabled(
-        rideMemory.count > 0 || rideTimelineMemory.count > 0 || rideMemory.learning || rideTimelineMemory.learning);
+        rideMemory.count > 0
+            || rideTimelineMemory.count > 0
+            || balanceTimelineMemory.count > 0
+            || rideMemory.learning
+            || rideTimelineMemory.learning
+            || balanceTimelineMemory.learning);
 
     if (group != directorConflictGroup)
     {
@@ -1877,6 +2133,7 @@ void PluginEditor::updateDirectorView()
         syncDirectorSelectedControls(nullptr);
         directorApplyTipButton.setButtonText("Apply Tip");
         directorApplyTipButton.setEnabled(false);
+        directorAnalyzeAllButton.setEnabled(false);
         directorFooterLabel.setText("Select Group 1-16 to read linked Nodes.", juce::dontSendNotification);
         directorFooterLabel.setColour(juce::Label::textColourId, theme::textMuted);
         return;
@@ -1884,6 +2141,7 @@ void PluginEditor::updateDirectorView()
 
     const auto snapshot = StageMindLinkRegistry::instance().readGroup(group);
     directorSceneView.setSnapshot(snapshot);
+    directorAnalyzeAllButton.setEnabled(snapshot.count > 0);
 
     LinkPeerSnapshot selectedNode;
     auto selectedNodeFound = false;

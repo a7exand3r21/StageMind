@@ -19,10 +19,10 @@ inline juce::StringArray makeSidechainConflictModeNames()
 {
     return {
         "Off",
-        "Make Space",
-        "Vocal Ducks Instrument",
+        "Broad Duck",
+        "Vocal Ducks This",
         "Kick Ducks Bass",
-        "Snare Ducks Instrument",
+        "Snare Ducks This",
         "Lead Ducks Pad",
         "Custom"
     };

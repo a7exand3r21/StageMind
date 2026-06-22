@@ -22,14 +22,20 @@ Use this before distributing any build.
 - [ ] Presets load correctly.
 - [ ] Automation writes and reads correctly.
 - [ ] No parameter ID was renamed accidentally.
-- [ ] StageMind Node 0.9.2 metadata/version is visible in the UI and VST3 module info.
+- [ ] StageMind Node 0.11.3 metadata/version is visible in the UI and VST3 module info.
 
 ## Audio
 
 - [ ] No clicks when changing parameters.
 - [ ] No clicks under automation.
 - [ ] Bypass is clean.
-- [ ] Output gain is controlled.
+- [ ] Output Trim is controlled.
+- [ ] Stage Gain `Ride` moves quiet/loud material toward the selected target without clipping above the ceiling.
+- [ ] Stage Gain `Static` captures applied gain after `Analyze` and restores it after project save/reopen.
+- [ ] Stage Gain meter mode changes between dBFS, VU, RMS, LUFS M, LUFS S, and LUFS I.
+- [ ] Director `Analyze All` sends Static Analyze commands to linked Nodes in the selected group.
+- [ ] Reported plugin latency is stable and playback stays aligned after look-ahead limiting.
+- [ ] Positive Output Trim is included in the final Stage Gain ceiling path.
 - [ ] CPU use is acceptable.
 - [ ] No denormal CPU spike during silence.
 - [ ] Sample-rate changes work.
@@ -44,7 +50,8 @@ Use this before distributing any build.
 ## UI
 
 - [ ] All controls show correct values.
-- [ ] Node UI shows `Motion Preset` and `Double` in normal Node mode.
+- [ ] Output control is labeled `Output Trim` and still reads/writes the existing `output_gain` value in dB.
+- [ ] Node UI shows `Motion Preset` and `Doubler` in normal Node mode.
 - [ ] Knobs/sliders respond smoothly.
 - [ ] Hover/active/disabled states work.
 - [ ] Animation does not stutter.
@@ -64,7 +71,7 @@ Use this before distributing any build.
 - [ ] Director conflict list is stable and observe-only.
 - [ ] Director conflict rows remain visible as `resolved` after a conflict clears.
 - [ ] Director active conflict rows show correction tips.
-- [ ] Director `Apply to #...` changes only the target Node's suggested Width, Depth, or SC Mode.
+- [ ] Director `Apply to #...` changes only the target Node's suggested Width, Depth, or Ducking mode.
 - [ ] Director sidechain commands still leave routing and SC Enable manual.
 - [ ] Director scene draws active conflict arrows between peer and target Nodes.
 - [ ] Director group overview shows Groups 1-16 with node/active counts.
@@ -76,16 +83,36 @@ Use this before distributing any build.
 - [ ] Learned resonance profile survives FL project save/reopen.
 - [ ] Resonance rider releases reduction during silence instead of holding a static notch.
 - [ ] Auto mode applies `Kick Ducks Bass` on a Bass Node when a Kick/Suno Drums peer is active and low overlap is present.
-- [ ] Auto mode applies `Make Space` on a harmonic instrument Node when a Suno Drums peer conflicts.
+- [ ] Auto mode applies broad ducking on a harmonic instrument Node when a Suno Drums peer conflicts.
+- [ ] Director Memory shows separate `Timeline` and `Balance` counts.
+- [ ] Director Balance Memory records a balance event during playback when one Auto-enabled Node is clearly too loud or quiet.
+- [ ] Director Balance Memory marks the nearby balance event as `resolved` once the group is balanced.
+- [ ] Director Balance Memory survives DAW project save/reopen.
+- [ ] Director Balance Memory shows section labels such as Intro, Verse, Chorus, Drop, or Section N.
+- [ ] Balance events near adjacent section boundaries do not merge into one event.
+- [ ] Director Balance treats lead vocal as a forward role, not equal RMS with pads/FX.
+- [ ] Director Balance cuts pads/FX that sit at vocal loudness.
+- [ ] Director Balance can boost a quiet vocal against drums/bass in guarded steps.
+- [ ] Director Balance ignores Nodes whose Auto Assist is `Off` or `Suggest`.
 - [ ] Auto sidechain actions select `Trigger: StageMind Link`, enable `SC Enable`, and show GR movement without FL manual sidechain routing.
+- [ ] Auto Balance shows `Auto level ... dB` during obvious section-level compensation.
+- [ ] Auto Balance learned target survives FL project save/reopen.
+- [ ] Director Auto sends gentle Output Trim corrections when one active Auto Node is clearly too loud/quiet for its role.
+- [ ] Director Auto does not boost Output Trim past +3 dB.
+- [ ] Director Auto does not cut Output Trim past -3 dB.
+- [ ] Director Auto does not send Output Trim corrections to Nodes in Stage Gain `Static` or `Off`.
+- [ ] Turning `SC Enable` off on an already configured ducking path blocks Auto from turning it back on.
+- [ ] Diagnostic snapshot rows stop growing while the host transport is stopped.
+- [ ] Director Auto does not switch one already-ducking Node between multiple ducking modes every few ticks.
+- [ ] Director Group Balance does not move Nodes that are not set to Auto.
 - [ ] Auto mode scans a group with three or more Nodes and applies the best local action even when the compact UI peer is a different instrument.
-- [ ] Director marks rows as `resolved` when the target Node already has the suggested Width, Depth, or SC Mode action applied by Auto.
+- [ ] Director marks rows as `resolved` when the target Node already has the suggested Width, Depth, or Ducking mode action applied by Auto.
 - [ ] Director shows the Auto selector in Director mode.
 - [ ] Director Auto sends a guarded command for an active unresolved conflict when both Director and target Node are set to `Auto`.
 - [ ] Director Auto sidechain commands make the target use `Trigger: StageMind Link`, enable `SC Enable`, and follow the conflict peer activity.
 - [ ] Director Auto does not change a target Node that is not set to `Auto`.
 - [ ] Director Auto continues to send guarded commands when the Director UI window is closed.
-- [ ] Manual Director `Apply to #...` still changes only Width, Depth, or SC Mode.
+- [ ] Manual Director `Apply to #...` still changes only Width, Depth, or Ducking mode.
 - [ ] New Node instances start with Link enabled, Group 1, and Auto Assist Auto.
 - [ ] New Director instances start on Group 1 after switching Mode to Director.
 - [ ] Director sees newly inserted idle Nodes in Group 1 before playback starts.
@@ -106,7 +133,7 @@ Use this before distributing any build.
 - [ ] Ride Memory survives FL project save/reopen.
 - [ ] Ride Memory reapplies a remembered correction when matching target/source roles are present again.
 - [ ] Motion Preset changes Stage View movement speed/shape and audible pan/side movement.
-- [ ] Double control changes pseudo-double amount only on roles that allow pseudo-double.
+- [ ] Doubler control changes pseudo-double amount only on roles that allow pseudo-double.
 - [ ] Depth remains zero-latency on the dry path and adds a more audible room-like tail at higher values.
 
 ## Host compatibility

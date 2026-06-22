@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(StageMind VERSION 0.9.2 LANGUAGES C CXX)
+project(StageMind VERSION 0.11.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,6 +49,7 @@ target_sources(StageMindNode
         Source/DSP/DepthProcessor.cpp
         Source/DSP/DynamicEQ.cpp
         Source/DSP/LinkSpectralAnalyzer.cpp
+        Source/DSP/LevelRider.cpp
         Source/DSP/LowMonoProcessor.cpp
         Source/DSP/MidSideProcessor.cpp
         Source/DSP/MotionProcessor.cpp
@@ -58,6 +59,7 @@ target_sources(StageMindNode
         Source/DSP/SidechainDetector.cpp
         Source/DSP/SidechainDynamicEQ.cpp
         Source/DSP/SideHighPassProcessor.cpp
+        Source/DSP/StageGainLoudnessMeter.cpp
         Source/DSP/SpatialProcessor.cpp
         Source/UI/DirectorSceneView.cpp
         Source/UI/HardwareLookAndFeel.cpp
@@ -83,10 +85,12 @@ target_link_libraries(StageMindNode
 )
 
 add_executable(StageMindDSPTests
+    Tests/BalanceTimelineMemoryTests.cpp
     Tests/LinkActivityEnvelopeTests.cpp
     Tests/LinkSpectralAnalyzerTests.cpp
     Tests/LinkSuggestionEngineTests.cpp
     Tests/ResonanceDetectorTests.cpp
+    Tests/RoleBalanceModelTests.cpp
     Tests/RideMemoryTests.cpp
     Tests/RideTimelineMemoryTests.cpp
     Tests/StageMindLinkRegistryTests.cpp
@@ -98,10 +102,13 @@ add_executable(StageMindDSPTests
     Source/DSP/DepthProcessor.cpp
     Source/DSP/DynamicEQ.cpp
     Source/DSP/LinkSpectralAnalyzer.cpp
+    Source/DSP/LevelRider.cpp
     Source/DSP/MotionProcessor.cpp
+    Source/DSP/MidSideProcessor.cpp
     Source/DSP/PseudoDoubleProcessor.cpp
     Source/DSP/ResonanceDetector.cpp
     Source/DSP/ResonanceLearner.cpp
+    Source/DSP/StageGainLoudnessMeter.cpp
 )
 
 target_include_directories(StageMindDSPTests
